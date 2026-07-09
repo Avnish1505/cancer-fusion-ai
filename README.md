@@ -180,4 +180,4 @@ This is a research and educational project. It is **not** a certified medical de
 
 **Avnish Singh** — B.Tech CSE, Babu Banarasi Das University
 Co-author, ADG 2026 International Conference (AI in Legal Technology)
-[LinkedIn] · [Portfolio]
+[www.linkedin.com/in/avnish-singh-a94772309] · [https://website-bzc5.vercel.app/]
