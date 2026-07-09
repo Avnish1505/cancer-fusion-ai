@@ -1,106 +1,183 @@
-# Cancer Fusion AI — Multi-Modal Skin Lesion Classification
+# Cancer Fusion AI 🔬
 
-**Phase 1: Image-only baseline** (Phase 2 will add patient metadata fusion, Phase 3 explainability)
+A multimodal deep learning pipeline for skin lesion classification on the **HAM10000** dataset — combining a CNN image encoder with patient metadata (age, sex, lesion location), and adding an **explainability layer** (Grad-CAM + LLM-generated clinical reports) so predictions aren't a black box.
 
-## What this is
+Built as an end-to-end, phased project: from an image-only baseline to a fused multimodal model to human-readable AI explanations.
 
-A research-grade pipeline for skin cancer classification on the HAM10000 dataset,
-built to eventually fuse image + patient metadata + generate human-readable
-explanation reports — not just a "cancer / no cancer" black box.
+---
 
-This is Phase 1: a solid, properly-validated, leak-free image classification
-baseline. Everything downstream (fusion, explainability) builds on this foundation.
+## 🧠 Why this project
 
-## Why this differs from typical student projects
+Skin cancer classifiers are usually judged only on accuracy. In a clinical-adjacent setting, that's not enough — a model needs to show **what** it looked at and **why**, and it needs to fold in the kind of context (age, sex, lesion site) that a real clinician would use. This project treats explainability as a first-class feature, not an afterthought.
 
-- **Lesion-level train/val/test splitting** — HAM10000 has multiple photos of the
-  same lesion. Splitting by `image_id` naively causes data leakage (same lesion's
-  photos in both train and test), which inflates accuracy artificially. This
-  pipeline splits by `lesion_id` instead. Verified by an explicit leakage test.
-- **Class-weighted loss** — HAM10000 is ~67% one class (`nv`). Naive training
-  collapses to predicting the majority class. Class weights correct for this.
-- **Melanoma recall tracked explicitly** — in medical AI, overall accuracy is a
-  misleading headline metric. A missed melanoma (false negative) is far more
-  costly than a false alarm, so this is reported separately in evaluation.
-- **Fails loudly and clearly, not silently** — missing images, corrupt files, bad
-  configs, and malformed data all raise clear, actionable errors instead of
-  cryptic crashes mid-training or (worse) silently corrupting results.
+---
 
-## Project structure
+## 🏗️ Architecture
+
+**Phase 1 — Image-only baseline**
+ResNet50 (ImageNet pretrained) as the feature extractor, fine-tuned on HAM10000's 7 diagnostic classes.
+
+**Phase 2 — Metadata fusion**
+Patient metadata (age, sex, anatomical site) is processed through a small MLP and concatenated with the image embedding before the final classifier head — so the model reasons over pixels *and* clinical context together.
+
+```
+Image ──► ResNet50 (encoder) ──► image_features (2048-d)
+                                            │
+Metadata ──► MLP (128 → 64) ──► meta_features (64-d)
+                                            │
+                                    concat + classifier head
+                                            │
+                                      7-class logits
+```
+
+**Phase 3 — Explainability layer** ✅ *(current)*
+- **Grad-CAM** on the final conv block of the ResNet50 encoder, producing a heatmap over the exact regions that drove each prediction.
+- **LLM-generated clinical reports**: the prediction, confidence, Grad-CAM context, and patient metadata are passed to an LLM (via NVIDIA NIM, OpenAI-compatible API) which writes a short, readable explanation — always with an explicit disclaimer that this is a research prototype, not a diagnostic tool.
+
+---
+
+## 📊 Dataset
+
+[HAM10000 ("Human Against Machine")](https://www.kaggle.com/datasets/kmader/skin-cancer-mnist-ham10000) — ~10,000 dermatoscopic images across 7 classes:
+
+| Code | Diagnosis |
+|------|-----------|
+| `akiec` | Actinic keratoses / intraepithelial carcinoma |
+| `bcc` | Basal cell carcinoma |
+| `bkl` | Benign keratosis-like lesions |
+| `df` | Dermatofibroma |
+| `mel` | Melanoma |
+| `nv` | Melanocytic nevi |
+| `vasc` | Vascular lesions |
+
+The dataset is heavily imbalanced (`nv` ≈ 67% of samples) — handled via inverse-frequency class weighting in the loss function.
+
+**Split strategy:** stratified split **by `lesion_id`**, not by image, since some lesions have multiple photos. This prevents the same lesion's images from leaking across train/val/test.
+
+---
+
+## ⚙️ Setup
+
+```bash
+git clone https://github.com/<your-username>/cancer-fusion-ai.git
+cd cancer-fusion-ai
+pip install -r requirements.txt
+```
+
+Download the [HAM10000 dataset](https://www.kaggle.com/datasets/kmader/skin-cancer-mnist-ham10000) and update the paths in `configs/config.yaml`:
+
+```yaml
+data:
+  metadata_csv: "path/to/HAM10000_metadata.csv"
+  images_dir_part1: "path/to/HAM10000_images_part_1"
+  images_dir_part2: "path/to/HAM10000_images_part_2"
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+
+model:
+  backbone: "resnet50"      # or "efficientnet_b0"
+  num_classes: 7
+  pretrained: true
+  dropout: 0.3
+
+train:
+  use_metadata: true
+  image_size: 224
+  batch_size: 32
+  num_epochs: 50
+  learning_rate: 0.0001
+  early_stopping_patience: 10
+  use_class_weights: true
+  device: "cuda"
+```
+
+### Train
+
+```bash
+python -m src.train --config configs/config.yaml
+```
+
+Trains with early stopping (patience-based on val macro-F1), saves the best checkpoint to `paths.checkpoint_dir/best_model.pt`.
+
+### Evaluate
+
+```bash
+python -m src.evaluate --config configs/config.yaml
+```
+
+---
+
+## 📈 Results
+
+Phase 2 (image + metadata fusion), ResNet50 backbone, early-stopped at epoch 35/50:
+
+| Metric | Value |
+|---|---|
+| Best validation macro-F1 | **0.726** |
+| Train accuracy (best epoch) | ~0.90 |
+| Val accuracy (best epoch) | ~0.83 |
+
+> Train/val F1 gap after ~epoch 25 indicates the model starts overfitting past that point — early stopping catches the best generalizing checkpoint rather than the lowest training loss. Class-imbalance handling (weighted loss) and further augmentation are natural next steps to close this gap further.
+
+---
+
+## 🔍 Explainability in action
+
+Each prediction is paired with:
+1. A **Grad-CAM heatmap** localizing the image regions the model relied on
+2. An **LLM-generated report** contextualizing the prediction with lesion morphology and patient metadata, always flagged as research-only
+
+Example (melanoma sample, val set):
+
+> *"The AI model analyzed the image of the 45-year-old female patient's lower extremity lesion and predicted melanoma with 100.0% confidence... The model's Grad-CAM heatmap specifically focused on the most visually heterogeneous and structurally irregular regions of the lesion to justify its high-confidence prediction. It is crucial to emphasize that this AI system is a research and educational prototype and is NOT a medical diagnostic tool..."*
+
+The heatmap correctly localizes onto the asymmetric, irregularly pigmented core of the lesion — the same region a dermatologist would visually flag under the ABCDE rule.
+
+---
+
+## 🗂️ Project structure
 
 ```
 cancer-fusion-ai/
-├── configs/
-│   └── config.yaml          # All settings — nothing hardcoded in code
 ├── src/
-│   ├── config.py             # Config loading + validation
-│   ├── dataset.py            # HAM10000 dataset, leak-free splitting, class weights
-│   ├── transforms.py         # Augmentation pipeline
-│   ├── model.py               # ResNet50/EfficientNet-B0 classifier
-│   ├── train.py               # Training loop with early stopping + checkpointing
-│   ├── evaluate.py            # Confusion matrix, classification report, melanoma recall
-│   └── utils.py                # Seeding, device handling, checkpoint I/O
-├── tests/
-│   ├── smoke_test.py          # End-to-end pipeline test on fake data
-│   └── edge_case_test.py      # Error-handling tests (missing files, bad configs, etc.)
+│   ├── config.py        # YAML config loader + validation
+│   ├── dataset.py        # HAM10000Dataset, stratified split, class weights
+│   ├── model.py           # CancerImageClassifier (image + metadata fusion)
+│   ├── transforms.py      # train/eval augmentation pipelines
+│   ├── train.py            # training loop, early stopping, checkpointing
+│   ├── evaluate.py         # held-out evaluation
+│   └── utils.py             # seeding, device selection, checkpoint I/O
+├── configs/
+│   └── config.yaml
+├── notebooks/
+│   └── explainability_demo.ipynb   # Grad-CAM + LLM report generation (Phase 3)
 └── requirements.txt
 ```
 
-## Setup — run this on Kaggle (recommended, free GPU + dataset already hosted)
+---
 
-1. Create a new Kaggle Notebook.
-2. Add the dataset: **"Skin Cancer MNIST: HAM10000"** (search it in Add Data).
-3. Upload this repo's `src/` and `configs/` folders (or `git clone` if you push
-   this to GitHub first — recommended, since that's your actual goal).
-4. In the notebook:
-   ```bash
-   pip install -r requirements.txt
-   ```
-5. Update `configs/config.yaml` — check the exact dataset paths Kaggle mounts
-   (usually under `/kaggle/input/skin-cancer-mnist-ham10000/`, but verify with
-   `!ls /kaggle/input/`).
-6. Enable GPU: Notebook settings → Accelerator → GPU T4 x2 (or similar).
-7. Run:
-   ```bash
-   python -m src.train --config configs/config.yaml
-   python -m src.evaluate --config configs/config.yaml --checkpoint checkpoints/best_model.pt
-   ```
+## 🛠️ Tech stack
 
-## Setup — run locally first (to verify everything works before using GPU quota)
+`PyTorch` · `torchvision` (ResNet50) · `scikit-learn` (splitting, metrics) · `OpenCV` (Grad-CAM overlay) · `NVIDIA NIM` (LLM inference, OpenAI-compatible API) · `pandas` / `NumPy`
 
-```bash
-pip install -r requirements.txt
-python tests/smoke_test.py       # ~30 seconds, verifies the full pipeline on fake data
-python tests/edge_case_test.py   # verifies error handling
-```
+---
 
-Both should print `ALL ... TESTS PASSED ✅`. **Run these before every real
-training run on Kaggle** — catching a bug in a 10-second local test beats
-discovering it 15 minutes into a GPU run.
+## 🚧 Roadmap
 
-## Roadmap
+- [ ] **Phase 4** — Model evaluation deep-dive: per-class precision/recall/confusion matrix, error analysis on misclassified melanoma cases (highest clinical stakes)
+- [ ] **Phase 5** — Lightweight deployment: Gradio/Streamlit demo for interactive upload → prediction → Grad-CAM → report
 
-- [x] **Phase 1** — Image-only baseline (this repo state)
-- [ ] **Phase 2** — Fuse patient metadata (age, sex, lesion location) via a
-      tabular branch + fusion layer
-- [ ] **Phase 3** — Explainability: Grad-CAM visual heatmaps + LLM-generated
-      plain-language diagnostic reasoning
-- [ ] **Phase 4** — FastAPI serving + simple demo UI
-- [ ] **Phase 5** — Polish, benchmark comparison table, GitHub release
+---
 
-## Dataset citation
+## ⚠️ Disclaimer
 
-Tschandl, P., Rosendahl, C. & Kittler, H. The HAM10000 dataset, a large
-collection of multi-source dermatoscopic images of common pigmented skin
-lesions. *Sci Data* 5, 180161 (2018).
+This is a research and educational project. It is **not** a certified medical device and must **not** be used for real clinical diagnosis or treatment decisions. All outputs should be verified by a qualified healthcare professional.
 
-## Related work
+---
 
-*(Fill this in as you read papers — write each entry in your own words,
-summarizing their approach and how this project's angle differs. This
-section is what makes the repo look like real research rather than a copy.)*
+## 👤 Author
 
-## Disclaimer
-
-This is a research/educational project, not a medical device. It is not
-validated for clinical use and must not be used for actual diagnosis.
+**Avnish Singh** — B.Tech CSE, Babu Banarasi Das University
+Co-author, ADG 2026 International Conference (AI in Legal Technology)
+[LinkedIn] · [Portfolio]
