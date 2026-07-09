@@ -1,4 +1,13 @@
 # Cancer Fusion AI 🔬
+# 🩺 Cancer Fusion AI
+
+![Python](https://img.shields.io/badge/Python-3.12-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-DeepLearning-red)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+![Status](https://img.shields.io/badge/Status-Active-success)
+
+Research-grade multimodal skin cancer classification using deep learning, metadata fusion, explainable AI (Grad-CAM), and FastAPI.
 
 A multimodal deep learning pipeline for skin lesion classification on the **HAM10000** dataset — combining a CNN image encoder with patient metadata (age, sex, lesion location), and adding an **explainability layer** (Grad-CAM + LLM-generated clinical reports) so predictions aren't a black box.
 
