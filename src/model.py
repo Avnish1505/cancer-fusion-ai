@@ -13,10 +13,18 @@ SUPPORTED_BACKBONES = ["resnet50", "efficientnet_b0"]
 
 
 class CancerImageClassifier(nn.Module):
-    def __init__(self, backbone: str = "resnet50", num_classes: int = 7,
-                 pretrained: bool = True, dropout: float = 0.3):
+    def __init__(
+        self,
+        backbone: str = "resnet50",
+        num_classes: int = 7,
+        pretrained: bool = True,
+        dropout: float = 0.3,
+        use_metadata: bool = False,
+        metadata_dim: int = 0,
+    ):
         super().__init__()
 
+        # --- 1. Image Backbone (Feature Extractor) ---
         if backbone not in SUPPORTED_BACKBONES:
             raise ValueError(
                 f"Unsupported backbone '{backbone}'. Supported: {SUPPORTED_BACKBONES}"
@@ -40,35 +48,66 @@ class CancerImageClassifier(nn.Module):
 
         self.encoder = base_model
 
+        # --- 2. Metadata Processor (Tabular MLP) ---
+        self.use_metadata = use_metadata
+        self.metadata_processor = None
+        metadata_feature_dim = 0
+
+        if self.use_metadata:
+            if metadata_dim <= 0:
+                raise ValueError("metadata_dim must be positive when use_metadata is True")
+            
+            # A simple 2-layer MLP to process the tabular data
+            metadata_feature_dim = 64 # The output size of our metadata MLP
+            self.metadata_processor = nn.Sequential(
+                nn.Linear(metadata_dim, 128),
+                nn.ReLU(inplace=True),
+                nn.Dropout(dropout),
+                nn.Linear(128, metadata_feature_dim),
+                nn.ReLU(inplace=True),
+            )
+
+        # --- 3. Classifier Head (takes FUSED features as input) ---
+        classifier_input_dim = self.feature_dim + metadata_feature_dim
+
         self.classifier_head = nn.Sequential(
             nn.Dropout(dropout),
-            nn.Linear(self.feature_dim, 256),
+            nn.Linear(classifier_input_dim, 256),
             nn.ReLU(inplace=True),
             nn.Dropout(dropout),
             nn.Linear(256, num_classes),
         )
 
     def forward_features(self, x: torch.Tensor) -> torch.Tensor:
-        """Returns the raw feature embedding (useful for Phase 2 fusion)."""
+        """Returns the raw feature embedding from the image backbone."""
         return self.encoder(x)
 
     def forward(self, x: torch.Tensor, meta: torch.Tensor = None) -> torch.Tensor:
-        # Phase 1: image-only
-        # Phase 2 will add a tabular branch and fuse its output with these features
-        # if meta is not None:
-        #     ...
+        # 1. Get image features from the CNN backbone
+        image_features = self.forward_features(x)
 
-        features = self.forward_features(x)
-        logits = self.classifier_head(features)
+        if self.use_metadata:
+            # 2. Get metadata features from the tabular MLP
+            meta_features = self.metadata_processor(meta)
+            # 3. Fuse by concatenating along the feature dimension
+            fused_features = torch.cat((image_features, meta_features), dim=1)
+            logits = self.classifier_head(fused_features)
+        else:
+            logits = self.classifier_head(image_features)
+            
         return logits
 
 
 def build_model(config: dict) -> CancerImageClassifier:
     model_cfg = config["model"]
+    train_cfg = config["train"]
+
     model = CancerImageClassifier(
         backbone=model_cfg.get("backbone", "resnet50"),
         num_classes=model_cfg["num_classes"],
         pretrained=model_cfg.get("pretrained", True),
         dropout=model_cfg.get("dropout", 0.3),
+        use_metadata=train_cfg.get("use_metadata", False),
+        metadata_dim=model_cfg.get("metadata_dim", 0),
     )
     return model

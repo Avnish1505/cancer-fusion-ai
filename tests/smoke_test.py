@@ -150,6 +150,7 @@ def run_smoke_test():
         transform=get_eval_transforms(64),
         use_metadata=config["train"]["use_metadata"],
         age_scaler=train_dataset.age_scaler,
+        age_median=train_dataset.age_median,
         metadata_columns=train_dataset.metadata_columns
     )
     assert len(train_dataset) == len(train_df), "Dataset length mismatch"

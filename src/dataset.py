@@ -54,6 +54,7 @@ class HAM10000Dataset(Dataset):
         transform=None,
         use_metadata: bool = False,        # NEW
         age_scaler: Optional[StandardScaler] = None,  # NEW — fit on train, reuse for val/test
+        age_median: Optional[float] = None,           # NEW - fit on train, reuse for val/test
         metadata_columns: Optional[List[str]] = None, # NEW - pass train's columns for val/test
     ):
         """
@@ -64,6 +65,7 @@ class HAM10000Dataset(Dataset):
             transform: torchvision transform pipeline
             use_metadata: if True, process and return tabular data alongside images
             age_scaler: if provided, use this scaler for age; otherwise, fit a new one
+            age_median: if provided, use this value to fill missing ages; otherwise, compute it
             metadata_columns: if provided, align metadata to this exact column set
         """
         self.image_dirs = [Path(d) for d in image_dirs]
@@ -71,14 +73,20 @@ class HAM10000Dataset(Dataset):
         self.transform = transform
         self.use_metadata = use_metadata
         self.age_scaler = age_scaler
-
-        self.use_metadata = use_metadata
+        self.age_median = age_median
 
         if self.use_metadata:
             df = dataframe.copy()
 
             # --- Age: numeric, handle NaN, then scale ---
-            df["age"] = df["age"].fillna(df["age"].median())
+            # For train set, compute median. For val/test, reuse train's median to prevent data leakage.
+            if self.age_median is None:
+                # This block runs for the training set
+                self.age_median = df["age"].median()
+
+            # Fill NaNs using the computed (or provided) median
+            df["age"] = df["age"].fillna(self.age_median)
+
             if self.age_scaler is None:
                 self.age_scaler = StandardScaler()
                 df["age_scaled"] = self.age_scaler.fit_transform(df[["age"]])

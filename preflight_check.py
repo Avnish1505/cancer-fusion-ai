@@ -80,6 +80,7 @@ def run_preflight_check(config_path: str):
         transform=get_eval_transforms(image_size),
         use_metadata=True,
         age_scaler=train_ds.age_scaler,
+        age_median=train_ds.age_median,
         metadata_columns=train_ds.metadata_columns,
     )
     print(f"[Check] Validation dataset created. Metadata dim: {len(val_ds.metadata_columns)}")

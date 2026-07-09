@@ -88,15 +88,21 @@ def main(config_path: str):
     
     # For val/test, reuse the scaler and column order from the training set
     age_scaler = train_dataset.age_scaler if use_metadata else None
+    age_median = train_dataset.age_median if use_metadata else None
     metadata_columns = train_dataset.metadata_columns if use_metadata else None
     if use_metadata:
         print(f"[train] Using metadata. Dimension: {len(metadata_columns)}")
+        # --- CRITICAL: Dynamically set metadata_dim in config for the model builder ---
+        # This is only known AFTER the dataset has been created.
+        config["model"]["metadata_dim"] = len(metadata_columns)
+
 
     val_dataset = HAM10000Dataset(
         val_df, image_dirs, config["data"]["image_extension"],
         transform=get_eval_transforms(image_size),
         use_metadata=use_metadata,
         age_scaler=age_scaler,
+        age_median=age_median,
         metadata_columns=metadata_columns,
     )
 
@@ -110,6 +116,7 @@ def main(config_path: str):
     )
 
     # ---- Model, loss, optimizer ----
+    # Now, build_model can correctly read metadata_dim from the config
     model = build_model(config).to(device)
 
     if config["train"]["use_class_weights"]:

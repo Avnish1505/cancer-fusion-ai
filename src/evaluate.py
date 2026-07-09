@@ -46,6 +46,7 @@ def evaluate(config_path: str, checkpoint_path: str):
         transform=get_eval_transforms(config["train"]["image_size"]) # transform doesn't matter here
     )
     age_scaler = train_dataset.age_scaler if use_metadata else None
+    age_median = train_dataset.age_median if use_metadata else None
     metadata_columns = train_dataset.metadata_columns if use_metadata else None
 
     test_dataset = HAM10000Dataset(
@@ -53,6 +54,7 @@ def evaluate(config_path: str, checkpoint_path: str):
         transform=get_eval_transforms(config["train"]["image_size"]),
         use_metadata=use_metadata,
         age_scaler=age_scaler,
+        age_median=age_median,
         metadata_columns=metadata_columns,
     )
 
@@ -64,6 +66,16 @@ def evaluate(config_path: str, checkpoint_path: str):
     model = build_model(config).to(device)
     load_checkpoint(checkpoint_path, model, device=device)
     model.eval()
+
+    # --- Debugging: Inspect the first batch from the test_loader ---
+    print("\n[evaluate] Inspecting first batch from test_loader...")
+    try:
+        batch = next(iter(test_loader))
+        print(f"  Batch contains {len(batch)} items.")
+        for i, item in enumerate(batch):
+            print(f"  Item {i}: type={type(item)}, shape={item.shape if hasattr(item, 'shape') else 'N/A'}")
+    except StopIteration:
+        print("  [ERROR] test_loader is empty!")
 
     all_preds, all_labels = [], []
     with torch.no_grad():
