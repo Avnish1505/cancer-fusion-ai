@@ -1,14 +1,39 @@
-# Cancer Fusion AI 🔬
+# 🩺 Cancer Fusion AI
+
+> An actively maintained open-source framework for reproducible multimodal medical AI.
+
+⭐ If this project helps you, please consider starring the repository.
+Contributions are welcome!
+
+![Python](https://img.shields.io/badge/Python-3.12-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-DeepLearning-red)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+![Status](https://img.shields.io/badge/Status-Active-success)
+![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen)
+![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-blue)
+![Open Source Love](https://badges.frapsoft.com/os/v1/open-source.svg?v=103)
+![Made with Love](https://img.shields.io/badge/Made%20with-❤️-red)
+
+Research-grade **open-source** multimodal framework for skin cancer classification using deep learning, metadata fusion, explainable AI, reproducible ML pipelines and production-ready engineering practices.
 
 A multimodal deep learning pipeline for skin lesion classification on the **HAM10000** dataset — combining a CNN image encoder with patient metadata (age, sex, lesion location), and adding an **explainability layer** (Grad-CAM + LLM-generated clinical reports) so predictions aren't a black box.
 
 Built as an end-to-end, phased project: from an image-only baseline to a fused multimodal model to human-readable AI explanations.
+
+**Topics:** `medical-ai` `pytorch` `deep-learning` `skin-cancer` `multimodal` `computer-vision` `gradcam` `healthcare-ai` `machine-learning` `ai` `research` `open-source`
 
 ---
 
 ## 🧠 Why this project
 
 Skin cancer classifiers are usually judged only on accuracy. In a clinical-adjacent setting, that's not enough — a model needs to show **what** it looked at and **why**, and it needs to fold in the kind of context (age, sex, lesion site) that a real clinician would use. This project treats explainability as a first-class feature, not an afterthought.
+
+---
+
+## ❤️ Why Open Source?
+
+Cancer Fusion AI is developed as an open-source project to make reproducible medical AI workflows accessible to students, researchers, and developers worldwide. The goal is to encourage collaboration, transparency, reproducible research, and community-driven improvements.
 
 ---
 
@@ -152,7 +177,13 @@ cancer-fusion-ai/
 │   └── config.yaml
 ├── notebooks/
 │   └── explainability_demo.ipynb   # Grad-CAM + LLM report generation (Phase 3)
-└── requirements.txt
+├── requirements.txt
+├── LICENSE
+├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
+├── SECURITY.md
+├── CHANGELOG.md
+└── README.md
 ```
 
 ---
@@ -170,14 +201,71 @@ cancer-fusion-ai/
 
 ---
 
+## 🚀 Long-Term Vision
+
+Cancer Fusion AI aims to become an open-source reference implementation for multimodal medical AI. Future releases will include:
+
+- [ ] Docker deployment
+- [ ] FastAPI APIs
+- [ ] CI/CD
+- [ ] Hugging Face demo
+- [ ] ONNX export
+- [ ] Mobile inference
+- [ ] Better explainability
+- [ ] Benchmarking
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! You can contribute by:
+
+- Improving documentation
+- Reporting bugs
+- Fixing issues
+- Improving model performance
+- Adding explainability techniques
+- Improving deployment
+
+Please open an Issue before submitting major Pull Requests.
+
+| Resource | Description |
+|---|---|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Guidelines for contributing to this project |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community standards and expectations |
+| [SECURITY.md](SECURITY.md) | How to report a security vulnerability |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+
 ## ⚠️ Disclaimer
 
 This is a research and educational project. It is **not** a certified medical device and must **not** be used for real clinical diagnosis or treatment decisions. All outputs should be verified by a qualified healthcare professional.
 
 ---
 
-## 👤 Author
+## ⭐ Support
 
-**Avnish Singh** — B.Tech CSE, Babu Banarasi Das University
-Co-author, ADG 2026 International Conference (AI in Legal Technology)
-[LinkedIn] · [Portfolio]
+If you find this repository useful:
+
+- ⭐ Star the repository
+- 🍴 Fork it
+- 🐛 Report issues
+- 💡 Suggest new features
+
+Your support helps this project reach more students, researchers, and developers.
+
+---
+
+## 👤 Author & Maintainer
+
+**Avnish Singh** — AI/ML Engineer, B.Tech CSE, Babu Banarasi Das University
+Primary Maintainer of Cancer Fusion AI · Co-author, ADG 2026 International Conference (AI in Legal Technology)
+
+[LinkedIn](https://www.linkedin.com/in/avnish-singh-a94772309) · [Portfolio](https://website-bzc5.vercel.app/)
