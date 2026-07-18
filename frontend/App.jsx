@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import './App.css'
 
-const API_BASE_URL = "https://cancer-fusion-ai-production.up.railway.app"; // apna FastAPI backend port yaha daalo
+const API_BASE_URL = "https://cancer-fusion-ai-production.up.railway.app" // apna FastAPI backend port yaha daalo
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
