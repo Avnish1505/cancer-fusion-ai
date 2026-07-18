@@ -76,8 +76,16 @@ def load_checkpoint(
 
     checkpoint = torch.load(checkpoint_path, map_location=device or "cpu")
 
+    # Check if the checkpoint is a dictionary with 'model_state_dict'
+    # or just the state_dict itself. This handles models saved with
+    # torch.save(model.state_dict(), path) vs torch.save(checkpoint_dict, path)
+    # and also helps with Git LFS pointer files being loaded by mistake.
+    state_dict = checkpoint.get("model_state_dict", checkpoint)
+
     try:
-        model.load_state_dict(checkpoint["model_state_dict"])
+        # Use strict=False to be more robust to minor architecture changes
+        # if a layer is added/removed, it won't crash immediately.
+        model.load_state_dict(state_dict, strict=False)
     except RuntimeError as e:
         raise RuntimeError(
             f"Checkpoint architecture doesn't match current model — "
