@@ -1,24 +1,31 @@
-# Byte-compiled / optimized / DLL files
+# Python virtual environment
+venv/
+
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# C extensions
-*.so
+# Large model/data files
+# Inko Git LFS ya cloud storage par rakhna best hai
+models/*.pt
+models/*.pth
+data/*.csv
 
-# Distribution / packaging
-.Python
-env/
-venv/
-pip-wheel-metadata/
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/.pnp
+frontend/.pnp.js
 
-# IDE configuration files
+# Test artifacts and logs
+/tmp/ham10000_*
+.npm/_logs/
+
+# IDE / Editor specific
 .vscode/
 .idea/
 
-# Generated output directories from your project
-/checkpoints/
-/results/
-/logs/
-/models/
+# macOS
+.DS_Store

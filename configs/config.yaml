@@ -1,0 +1,56 @@
+# ============================================================
+# Cancer Fusion AI - Phase 1 Config (Image-only baseline)
+# HAM10000 dataset (skin lesion classification)
+# ============================================================
+
+data:
+  # On Kaggle, HAM10000 dataset paths look like:
+  # /kaggle/input/skin-cancer-mnist-ham10000/
+  metadata_csv: "/kaggle/input/skin-cancer-mnist-ham10000/HAM10000_metadata.csv"
+  images_dir_part1: "/kaggle/input/skin-cancer-mnist-ham10000/HAM10000_images_part_1"
+  images_dir_part2: "/kaggle/input/skin-cancer-mnist-ham10000/HAM10000_images_part_2"
+  image_extension: ".jpg"
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  random_seed: 42
+
+model:
+  backbone: "resnet50"        # options: resnet50, efficientnet_b0
+  pretrained: true
+  num_classes: 7               # HAM10000 has 7 diagnostic categories
+  dropout: 0.3
+
+train:
+  image_size: 224
+  batch_size: 32
+  num_epochs: 20
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  early_stopping_patience: 5
+  use_class_weights: true      # HAM10000 is heavily imbalanced (nv class dominates)
+  num_workers: 2
+  device: "cuda"                # falls back to cpu automatically if unavailable
+
+paths:
+  checkpoint_dir: "./checkpoints"
+  log_dir: "./logs"
+  results_dir: "./results"
+
+logging:
+  log_every_n_steps: 20
+# ... baaki sabhi settings ...
+
+train:
+  image_size: 224
+  batch_size: 32
+  num_epochs: 50
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  early_stopping_patience: 10
+  use_class_weights: true
+  use_metadata: true    # <<<--- YEH LINE ADD YA UNCOMMENT KAREIN
+  num_workers: 2
+  device: "cuda"
+
+# ... baaki sabhi settings ...

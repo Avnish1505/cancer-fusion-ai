@@ -48,6 +48,9 @@ def evaluate(config_path: str, checkpoint_path: str):
     age_scaler = train_dataset.age_scaler if use_metadata else None
     age_median = train_dataset.age_median if use_metadata else None
     metadata_columns = train_dataset.metadata_columns if use_metadata else None
+    if use_metadata:
+        # Set metadata_dim in config so build_model creates the correct architecture
+        config["model"]["metadata_dim"] = len(metadata_columns)
 
     test_dataset = HAM10000Dataset(
         test_df, image_dirs, config["data"]["image_extension"],
