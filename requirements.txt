@@ -6,7 +6,7 @@ torchvision
 pandas
 numpy
 scikit-learn
-opencv-python
+opencv-python-headless
 matplotlib
 pyyaml
 openai
