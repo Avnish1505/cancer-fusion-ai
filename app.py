@@ -53,7 +53,7 @@ config["model"]["metadata_dim"] = len(metadata_columns)
 
 device = get_device(config["train"]["device"])
 model = build_model(config)
-load_checkpoint("models/best_model.pt", model, device=device)
+load_checkpoint("models/best_model.pth", model, device=device)
 model.eval()
 model.to(device)
 
