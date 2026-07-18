@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Vercel URL ke liye isko update karna padega
+    allow_origins=["https://cancer-fusion-ai.vercel.app"],  # Vercel URL ke liye isko update karna padega
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
