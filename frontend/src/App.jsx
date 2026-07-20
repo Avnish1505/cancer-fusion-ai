@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import './App.css'
 
-const API_BASE_URL = 'https://<YOUR_RAILWAY_APP_URL>' // Yahan apna Railway backend ka URL daalo
+const API_BASE_URL = 'https://cancer-fusion-ai-production.up.railway.app' // Yahan apna Railway backend ka URL daalo
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
