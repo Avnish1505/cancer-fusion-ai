@@ -1,8 +1,9 @@
-cat > src/App.jsx << 'EOF'
 import { useState, useMemo } from 'react'
 import './App.css'
 
-const API_BASE_URL = "https://cancer-fusion-ai-production.up.railway.app"
+// Env se URL lo. Agar env na ho to fallback use hoga.
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'https://cancer-fusion-ai-production.up.railway.app'
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
@@ -10,6 +11,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+
   const [age, setAge] = useState(50)
   const [sex, setSex] = useState('male')
   const [localization, setLocalization] = useState('back')
@@ -28,8 +30,10 @@ function App() {
       setError('Pehle ek image select karo')
       return
     }
+
     setLoading(true)
     setError(null)
+
     try {
       const formData = new FormData()
       formData.append('file', selectedFile)
@@ -42,7 +46,10 @@ function App() {
         body: formData,
       })
 
-      if (!response.ok) throw new Error(`Server error: ${response.status}`)
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+
       const data = await response.json()
       setResult(data)
     } catch (err) {
@@ -61,27 +68,59 @@ function App() {
     <div style={{ maxWidth: '700px', margin: '0 auto', padding: '2rem', textAlign: 'center' }}>
       <h1>🔬 Cancer Fusion AI</h1>
       <p style={{ color: '#888' }}>Skin Lesion Classifier — HAM10000</p>
+
       <div style={{ margin: '2rem 0' }}>
         <input type="file" accept="image/*" onChange={handleFileChange} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '2rem',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+        }}
+      >
         {preview && (
           <div>
             <h4>Original Image</h4>
-            <img src={preview} alt="preview" style={{ width: '250px', height: '250px', objectFit: 'cover', borderRadius: '12px' }} />
+            <img
+              src={preview}
+              alt="preview"
+              style={{ width: '250px', height: '250px', objectFit: 'cover', borderRadius: '12px' }}
+            />
           </div>
         )}
         {result?.gradcam_overlay_base64 && (
           <div>
             <h4>Grad-CAM Overlay</h4>
-            <img src={`data:image/png;base64,${result.gradcam_overlay_base64}`} alt="Grad-CAM Overlay" style={{ width: '250px', height: '250px', objectFit: 'cover', borderRadius: '12px' }} />
+            <img
+              src={`data:image/png;base64,${result.gradcam_overlay_base64}`}
+              alt="Grad-CAM Overlay"
+              style={{ width: '250px', height: '250px', objectFit: 'cover', borderRadius: '12px' }}
+            />
           </div>
         )}
       </div>
-      <div style={{ margin: '2rem 0', display: 'flex', justifyContent: 'center', gap: '1rem', alignItems: 'center' }}>
+
+      <div
+        style={{
+          margin: '2rem 0',
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '1rem',
+          alignItems: 'center',
+        }}
+      >
         <div>
           <label>Age: </label>
-          <input type="number" value={age} onChange={(e) => setAge(e.target.value)} style={{ width: '60px' }} />
+          <input
+            type="number"
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            style={{ width: '60px' }}
+          />
         </div>
         <div>
           <label>Sex: </label>
@@ -92,6 +131,7 @@ function App() {
           </select>
         </div>
       </div>
+
       {preview && (
         <div style={{ marginTop: '1rem' }}>
           <button onClick={handlePredict} disabled={loading}>
@@ -99,10 +139,22 @@ function App() {
           </button>
         </div>
       )}
+
       {error && <p style={{ color: 'red', marginTop: '1rem' }}>{error}</p>}
+
       {result && (
-        <div style={{ marginTop: '2rem', textAlign: 'left', background: '#1a1a1a', padding: '1.5rem', borderRadius: '12px' }}>
-          <h3>Prediction: {result.prediction_full_name} ({result.prediction.toUpperCase()})</h3>
+        <div
+          style={{
+            marginTop: '2rem',
+            textAlign: 'left',
+            background: '#1a1a1a',
+            padding: '1.5rem',
+            borderRadius: '12px',
+          }}
+        >
+          <h3>
+            Prediction: {result.prediction_full_name} ({result.prediction.toUpperCase()})
+          </h3>
           <p style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#4CAF50' }}>
             Confidence: {(result.confidence * 100).toFixed(2)}%
           </p>
@@ -121,4 +173,3 @@ function App() {
 }
 
 export default App
-EOF
