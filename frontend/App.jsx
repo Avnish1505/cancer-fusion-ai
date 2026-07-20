@@ -3,7 +3,8 @@ import './App.css'
 
 // Env se URL lo. Agar env na ho to fallback use hoga.
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'https://cancer-fusion-ai-production.up.railway.app'
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://cancer-fusion-ai-production.up.railway.app";
 
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
