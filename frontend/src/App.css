@@ -1,2 +1,304 @@
-/* Component styling intentionally deferred.
-   Design tokens live in src/index.css. */
+/* ==========================================================================
+   Clinical single-column layout
+   Built on design tokens defined in src/index.css.
+   ========================================================================== */
+
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-4) var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* ---- Hero ---- */
+
+.hero {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hero-title {
+  font-size: var(--text-4xl);
+  color: var(--color-text-primary);
+}
+
+.hero-subtitle {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--color-text-muted);
+}
+
+/* ---- Card ---- */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+/* ---- Dropzone ---- */
+
+.dropzone {
+  position: relative;
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+  cursor: pointer;
+  background: rgba(238, 241, 247, 0.02);
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base);
+}
+
+.dropzone:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-muted);
+}
+
+.dropzone:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-focus);
+}
+
+.dropzone--active {
+  border-style: solid;
+  border-color: var(--color-primary);
+  background: var(--color-primary-muted);
+}
+
+.dropzone-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropzone-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.dropzone-icon {
+  font-size: var(--text-4xl);
+}
+
+.dropzone-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  color: var(--color-text-primary);
+}
+
+.dropzone-subtitle {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+/* ---- Preview ---- */
+
+.preview-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.preview-image {
+  width: 220px;
+  height: 220px;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.preview-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ---- Patient fields ---- */
+
+.patient-fields {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  text-align: left;
+}
+
+.field label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.field input,
+.field select {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-focus);
+}
+
+/* ---- Predict button ---- */
+
+.predict-button {
+  align-self: center;
+  padding: var(--space-3) var(--space-8);
+  font-family: var(--font-heading);
+  font-weight: var(--font-semibold);
+  font-size: var(--text-base);
+  color: var(--color-bg);
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.predict-button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.predict-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.predict-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.error-message {
+  margin: 0;
+  text-align: center;
+  color: var(--color-danger);
+}
+
+/* ---- Result card ---- */
+
+.result-images {
+  display: flex;
+  gap: var(--space-6);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.result-image-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.result-image {
+  width: 220px;
+  height: 220px;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+}
+
+.result-heading {
+  margin: 0;
+  font-family: var(--font-heading);
+  color: var(--color-text-primary);
+}
+
+.confidence {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-primary);
+}
+
+.probabilities-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.probabilities-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 640px) {
+  .page {
+    padding: var(--space-6) var(--space-3) var(--space-10);
+    gap: var(--space-6);
+  }
+
+  .card {
+    padding: var(--space-5);
+  }
+
+  .hero-title {
+    font-size: var(--text-3xl);
+  }
+
+  .dropzone {
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .patient-fields {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .result-images {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .preview-image,
+  .result-image {
+    width: 100%;
+    max-width: 260px;
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+}
