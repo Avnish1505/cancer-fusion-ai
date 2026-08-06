@@ -5,9 +5,8 @@ a tabular branch + fusion layer, so the image encoder here is designed
 to be reused as a feature extractor later (see `forward_features`).
 """
 import torch
-import torch.nn as nn
-import torchvision.models as models
-
+from torch import nn
+from torchvision import models
 
 SUPPORTED_BACKBONES = ["resnet50", "efficientnet_b0"]
 

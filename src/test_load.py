@@ -1,10 +1,8 @@
 import torch
-import torch.nn as nn
-from torchvision import models
-from src.model import build_model
 from src.config import load_config
-from src.utils import load_checkpoint
 from src.dataset import HAM10000Dataset, load_metadata
+from src.model import build_model
+from src.utils import load_checkpoint
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)

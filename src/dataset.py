@@ -18,18 +18,15 @@ Design notes:
 - The dataset is heavily imbalanced (nv ~67% of samples), so we expose
   a helper to compute class weights for the loss function.
 """
-import warnings
 from pathlib import Path
-from typing import List, Tuple, Optional
 
-import numpy as np
-import pandas as pd
 import torch
 from PIL import Image, UnidentifiedImageError
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import Dataset
 
+import pandas as pd
 
 DX_LABELS = ["akiec", "bcc", "bkl", "df", "mel", "nv", "vasc"]
 LABEL_TO_IDX = {label: i for i, label in enumerate(DX_LABELS)}
@@ -49,13 +46,13 @@ class HAM10000Dataset(Dataset):
     def __init__(
         self,
         dataframe: pd.DataFrame,
-        image_dirs: List[str],
+        image_dirs: list[str],
         image_extension: str = ".jpg",
         transform=None,
         use_metadata: bool = False,        # NEW
-        age_scaler: Optional[StandardScaler] = None,  # NEW — fit on train, reuse for val/test
-        age_median: Optional[float] = None,           # NEW - fit on train, reuse for val/test
-        metadata_columns: Optional[List[str]] = None, # NEW - pass train's columns for val/test
+        age_scaler: StandardScaler | None = None,  # NEW — fit on train, reuse for val/test
+        age_median: float | None = None,           # NEW - fit on train, reuse for val/test
+        metadata_columns: list[str] | None = None, # NEW - pass train's columns for val/test
     ):
         """
         Args:
@@ -138,9 +135,9 @@ class HAM10000Dataset(Dataset):
                 "HAM10000 image folders (HAM10000_images_part_1 / part_2)."
             )
 
-        self.samples: List[Tuple[Path, str, int]] = resolved_rows
+        self.samples: list[tuple[Path, str, int]] = resolved_rows
 
-    def _resolve_image_path(self, image_id: str) -> Optional[Path]:
+    def _resolve_image_path(self, image_id: str) -> Path | None:
         filename = f"{image_id}{self.image_extension}"
         for directory in self.image_dirs:
             candidate = directory / filename
@@ -215,7 +212,7 @@ def stratified_split(
     val_split: float,
     test_split: float,
     random_seed: int = 42,
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Splits by lesion_id when available (to avoid the SAME lesion's images
     leaking across train/val/test — a common HAM10000 pitfall since some

@@ -19,16 +19,20 @@ import argparse
 import time
 
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
-
-from src.config import load_config, ConfigError
-from src.dataset import load_metadata, stratified_split, HAM10000Dataset, compute_class_weights
-from src.transforms import get_train_transforms, get_eval_transforms
+from src.config import load_config
+from src.dataset import (
+    HAM10000Dataset,
+    compute_class_weights,
+    load_metadata,
+    stratified_split,
+)
 from src.model import build_model
-from src.utils import set_seed, get_device
 from src.train import run_one_epoch
+from src.transforms import get_eval_transforms, get_train_transforms
+from src.utils import get_device, set_seed
+from torch import nn
+from torch.utils.data import DataLoader
 
 
 def run_preflight_check(config_path: str):

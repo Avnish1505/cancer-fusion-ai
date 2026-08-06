@@ -1,28 +1,27 @@
-import io
 import base64
-import numpy as np
-import pandas as pd
-import cv2
-import torch
-import matplotlib
-matplotlib.use('Agg')
-from sklearn.preprocessing import StandardScaler
+import io
 
-import matplotlib.pyplot as plt
-from PIL import Image
-from fastapi import FastAPI, File, UploadFile, Form
+import cv2
+import matplotlib
+import numpy as np
+import torch
+
+import pandas as pd
+
+matplotlib.use('Agg')
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
+from PIL import Image
+from sklearn.preprocessing import StandardScaler
 from src.config import load_config
+from src.dataset import DX_FULL_NAMES, DX_LABELS
 from src.model import build_model
-from src.dataset import DX_LABELS, DX_FULL_NAMES
 from src.transforms import get_eval_transforms
 from src.utils import get_device, load_checkpoint
 
 app = FastAPI(title="Cancer Fusion AI API")
 
-from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,7 +52,7 @@ config["model"]["metadata_dim"] = len(metadata_columns)
 
 device = get_device(config["train"]["device"])
 model = build_model(config)
-load_checkpoint("models/best_model.pth", model, device=device)
+load_checkpoint("models/best_model.pt", model, device=device)
 model.eval()
 model.to(device)
 

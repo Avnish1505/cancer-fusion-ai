@@ -9,15 +9,19 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from sklearn.metrics import f1_score, accuracy_score
-
-from src.config import load_config, ConfigError
-from src.dataset import load_metadata, stratified_split, HAM10000Dataset, compute_class_weights
-from src.transforms import get_train_transforms, get_eval_transforms
+from sklearn.metrics import accuracy_score, f1_score
+from src.config import ConfigError, load_config
+from src.dataset import (
+    HAM10000Dataset,
+    compute_class_weights,
+    load_metadata,
+    stratified_split,
+)
 from src.model import build_model
-from src.utils import set_seed, get_device, save_checkpoint, EarlyStopping
+from src.transforms import get_eval_transforms, get_train_transforms
+from src.utils import EarlyStopping, get_device, save_checkpoint, set_seed
+from torch import nn
+from torch.utils.data import DataLoader
 
 
 def run_one_epoch(model, dataloader, criterion, optimizer, device, is_train: bool, use_metadata: bool):

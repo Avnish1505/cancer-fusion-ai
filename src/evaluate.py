@@ -10,17 +10,21 @@ Usage:
 import argparse
 from pathlib import Path
 
-import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
-from torch.utils.data import DataLoader
+import torch
 from sklearn.metrics import classification_report, confusion_matrix
-
-from src.config import load_config, ConfigError
-from src.dataset import load_metadata, stratified_split, HAM10000Dataset, DX_LABELS, DX_FULL_NAMES
-from src.transforms import get_eval_transforms
+from src.config import ConfigError, load_config
+from src.dataset import (
+    DX_LABELS,
+    HAM10000Dataset,
+    load_metadata,
+    stratified_split,
+)
 from src.model import build_model
+from src.transforms import get_eval_transforms
 from src.utils import get_device, load_checkpoint
+from torch.utils.data import DataLoader
 
 
 def evaluate(config_path: str, checkpoint_path: str):

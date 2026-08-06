@@ -7,23 +7,35 @@ BEFORE running on the real dataset on Kaggle where a crash wastes GPU quota.
 This does not test model accuracy (data is random noise) — only that the
 code runs correctly without crashing, with correct tensor shapes.
 """
-import sys
 import shutil
+import sys
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
-from PIL import Image
 import yaml
+from PIL import Image
+
+import pandas as pd
 
 # Make src importable
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import load_config
-from src.dataset import load_metadata, stratified_split, HAM10000Dataset, compute_class_weights, DX_LABELS
-from src.transforms import get_train_transforms, get_eval_transforms
+from src.dataset import (
+    DX_LABELS,
+    HAM10000Dataset,
+    compute_class_weights,
+    load_metadata,
+    stratified_split,
+)
 from src.model import build_model
-from src.utils import set_seed, get_device, save_checkpoint, load_checkpoint, EarlyStopping
+from src.transforms import get_eval_transforms, get_train_transforms
+from src.utils import (
+    EarlyStopping,
+    get_device,
+    load_checkpoint,
+    save_checkpoint,
+)
 
 TEST_DIR = Path("/tmp/ham10000_smoke_test")
 
@@ -112,7 +124,7 @@ def run_smoke_test():
 
     print("\n[1/7] Building fake dataset...")
     csv_path, img_dir1, img_dir2 = build_fake_dataset(n_samples=60)
-    print(f"  Created 60 fake images across 2 folders + metadata CSV")
+    print("  Created 60 fake images across 2 folders + metadata CSV")
 
     print("\n[2/7] Building fake config...")
     config_path = build_fake_config(csv_path, img_dir1, img_dir2)
@@ -211,7 +223,7 @@ def run_smoke_test():
     model2 = build_model(config)
     checkpoint = load_checkpoint(ckpt_path, model2, device=torch.device("cpu"))
     assert checkpoint["epoch"] == 1, "Checkpoint epoch mismatch"
-    print(f"  Checkpoint saved and reloaded successfully")
+    print("  Checkpoint saved and reloaded successfully")
 
     stopper = EarlyStopping(patience=2, mode="max")
     assert stopper.step(0.5) == False

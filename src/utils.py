@@ -3,10 +3,11 @@ Shared utilities: reproducibility, device selection, checkpointing.
 """
 import os
 import random
+from pathlib import Path
+from typing import Any
+
 import numpy as np
 import torch
-from pathlib import Path
-from typing import Dict, Any
 
 
 def set_seed(seed: int = 42) -> None:
@@ -69,7 +70,7 @@ def load_checkpoint(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer = None,
     device: torch.device = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     path = Path(checkpoint_path)
     if not path.exists():
         raise FileNotFoundError(f"Checkpoint not found at '{checkpoint_path}'")
