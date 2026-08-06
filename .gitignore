@@ -22,6 +22,7 @@ frontend/.pnp.js
 # Test artifacts and logs
 /tmp/ham10000_*
 .npm/_logs/
+*.log
 
 # IDE / Editor specific
 .vscode/
