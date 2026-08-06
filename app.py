@@ -25,7 +25,11 @@ app = FastAPI(title="Cancer Fusion AI API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://cancer-fusion-ai.vercel.app"],  # Vercel URL ke liye isko update karna padega
+    allow_origins=[
+        "https://cancer-fusion-ai.vercel.app",  # Vercel URL ke liye isko update karna padega
+        "http://localhost:5173",  # local Vite dev server
+        "http://127.0.0.1:5173",  # local Vite dev server (127.0.0.1 form)
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
