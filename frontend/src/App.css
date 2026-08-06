@@ -45,6 +45,22 @@
   box-shadow: var(--shadow-md);
 }
 
+/* ---- Upload fieldset (disabled during loading) ---- */
+
+.upload-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.upload-fields:disabled {
+  opacity: 0.6;
+}
+
 /* ---- Dropzone ---- */
 
 .dropzone {
@@ -75,6 +91,11 @@
   border-style: solid;
   border-color: var(--color-primary);
   background: var(--color-primary-muted);
+}
+
+.dropzone--disabled {
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .dropzone-input {
@@ -130,6 +151,43 @@
 .preview-hint {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+
+/* ---- Scan-line overlay (shown on the preview while analyzing) ---- */
+
+.preview-scan {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.preview-scan--active .preview-image {
+  filter: brightness(0.82) saturate(1.15);
+}
+
+.preview-scan .scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--color-teal), transparent);
+  box-shadow: 0 0 12px 2px var(--color-primary-muted);
+  animation: scan-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes scan-sweep {
+  0% {
+    top: 0%;
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0.2;
+  }
 }
 
 /* ---- Patient fields ---- */
@@ -207,6 +265,129 @@
   margin: 0;
   text-align: center;
   color: var(--color-danger);
+}
+
+/* ---- Loading card ---- */
+
+.loading-card {
+  gap: var(--space-5);
+}
+
+.loading-scan {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+.loading-scan-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--color-teal), transparent);
+  animation: scan-slide 1.6s ease-in-out infinite;
+}
+
+@keyframes scan-slide {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-subtle);
+  transition: color var(--transition-base);
+}
+
+.stage-item--complete {
+  color: var(--color-text-muted);
+}
+
+.stage-item--active {
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
+}
+
+.stage-dot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
+  color: var(--color-bg);
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.stage-item--complete .stage-dot {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.stage-item--complete .stage-dot::after {
+  content: '✓';
+}
+
+.stage-item--active .stage-dot {
+  border-color: var(--color-primary);
+  border-top-color: transparent;
+  animation: stage-spin 0.9s linear infinite;
+}
+
+.stage-item--looping .stage-dot {
+  animation:
+    stage-spin 0.9s linear infinite,
+    stage-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes stage-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes stage-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--color-primary-muted);
+  }
+  50% {
+    box-shadow: 0 0 0 6px var(--color-primary-muted);
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---- Result card ---- */
