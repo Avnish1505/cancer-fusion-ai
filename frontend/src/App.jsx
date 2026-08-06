@@ -11,6 +11,48 @@ const LOADING_STAGES = [
 ]
 const STAGE_INTERVAL_MS = 1500
 
+// Coarse clinical risk grouping for HAM10000 diagnosis codes, used only to
+// color-code the presentation (does not affect the prediction itself).
+const RISK_BY_CLASS = {
+  mel: 'high',
+  bcc: 'high',
+  akiec: 'high',
+  bkl: 'medium',
+  nv: 'low',
+  df: 'low',
+  vasc: 'low',
+}
+
+const getRiskLevel = (className) => RISK_BY_CLASS[className?.toLowerCase()] || 'medium'
+
+const LOCALIZATION_OPTIONS = [
+  { value: 'back', label: 'Back' },
+  { value: 'lower extremity', label: 'Lower Extremity' },
+  { value: 'trunk', label: 'Trunk' },
+  { value: 'upper extremity', label: 'Upper Extremity' },
+  { value: 'abdomen', label: 'Abdomen' },
+  { value: 'face', label: 'Face' },
+  { value: 'chest', label: 'Chest' },
+  { value: 'foot', label: 'Foot' },
+  { value: 'neck', label: 'Neck' },
+  { value: 'scalp', label: 'Scalp' },
+  { value: 'hand', label: 'Hand' },
+  { value: 'ear', label: 'Ear' },
+  { value: 'genital', label: 'Genital' },
+  { value: 'acral', label: 'Acral' },
+  { value: 'unknown', label: 'Unknown' },
+]
+
+// Client-side only: keeps invalid/empty ages from being submitted.
+// Does not change what gets sent to the API when valid.
+const getAgeError = (value) => {
+  if (value === '' || value === null || value === undefined) return 'Age is required'
+  const num = Number(value)
+  if (Number.isNaN(num)) return 'Enter a valid number'
+  if (num < 0 || num > 120) return 'Enter an age between 0 and 120'
+  return null
+}
+
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [preview, setPreview] = useState(null)
@@ -62,9 +104,15 @@ function App() {
     processFile(e.dataTransfer.files?.[0])
   }
 
+  const ageError = getAgeError(age)
+
   const handlePredict = async () => {
     if (!selectedFile) {
       setError('Pehle ek image select karo')
+      return
+    }
+    if (ageError) {
+      setError('Please fix the highlighted field before predicting')
       return
     }
     setLoading(true)
@@ -122,6 +170,13 @@ function App() {
               if (loading) return
               fileInputRef.current?.click()
             }}
+            onKeyDown={(e) => {
+              if (loading) return
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                fileInputRef.current?.click()
+              }
+            }}
             role="button"
             tabIndex={loading ? -1 : 0}
             aria-disabled={loading}
@@ -133,6 +188,7 @@ function App() {
               onChange={handleFileChange}
               className="dropzone-input"
               aria-label="Upload lesion image"
+              tabIndex={-1}
             />
             {preview ? (
               <div className="preview-wrap">
@@ -154,16 +210,45 @@ function App() {
           </div>
 
           <div className="patient-fields">
-            <div className="field">
+            <div className={`field${ageError ? ' field--error' : ''}`}>
               <label htmlFor="age">Age</label>
-              <input id="age" type="number" value={age} onChange={(e) => setAge(e.target.value)} />
+              <input
+                id="age"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                max="120"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                aria-invalid={Boolean(ageError)}
+                aria-describedby={ageError ? 'age-error' : undefined}
+              />
+              {ageError ? (
+                <span className="field-error" id="age-error" role="alert">
+                  {ageError}
+                </span>
+              ) : (
+                <span className="field-hint">Years, 0–120</span>
+              )}
             </div>
+
             <div className="field">
               <label htmlFor="sex">Sex</label>
               <select id="sex" value={sex} onChange={(e) => setSex(e.target.value)}>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
                 <option value="unknown">Unknown</option>
+              </select>
+            </div>
+
+            <div className="field">
+              <label htmlFor="localization">Lesion Location</label>
+              <select id="localization" value={localization} onChange={(e) => setLocalization(e.target.value)}>
+                {LOCALIZATION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -226,20 +311,44 @@ function App() {
             )}
           </div>
 
-          <h3 className="result-heading">
-            Prediction: {result.prediction_full_name} ({result.prediction.toUpperCase()})
-          </h3>
-          <p className="confidence">Confidence: {(result.confidence * 100).toFixed(2)}%</p>
+          <div className={`prediction-summary risk-${getRiskLevel(result.prediction)}`}>
+            <span className="prediction-badge">Top Prediction</span>
+            <h3 className="prediction-name">{result.prediction_full_name}</h3>
+            <p className="prediction-code">{result.prediction.toUpperCase()}</p>
+            <p className="confidence">
+              Confidence <span className="confidence-value">{(result.confidence * 100).toFixed(2)}%</span>
+            </p>
+          </div>
 
-          <h4 className="result-heading">All Probabilities:</h4>
-          <ul className="probabilities-list">
-            {sortedProbabilities.map(([name, prob]) => (
-              <li key={name}>
-                <span>{name.toUpperCase()}</span>
-                <span>{(prob * 100).toFixed(2)}%</span>
-              </li>
-            ))}
-          </ul>
+          <div className="card-divider" />
+
+          <div className="probabilities-section">
+            <h4 className="result-heading">All Probabilities</h4>
+            <ul className="probabilities-list">
+              {sortedProbabilities.map(([name, prob], index) => {
+                const isTop = index === 0
+                const risk = getRiskLevel(name)
+                return (
+                  <li
+                    key={name}
+                    className={`probability-row risk-${risk}${isTop ? ' probability-row--top' : ''}`}
+                    style={{ '--bar-width': `${(prob * 100).toFixed(2)}%`, '--row-index': index }}
+                  >
+                    <div className="probability-row-header">
+                      <span className="probability-name">
+                        {name.toUpperCase()}
+                        {isTop && <span className="probability-top-badge">Top match</span>}
+                      </span>
+                      <span className="probability-value">{(prob * 100).toFixed(2)}%</span>
+                    </div>
+                    <div className="probability-bar-track">
+                      <div className="probability-bar-fill" />
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         </section>
       )}
     </div>

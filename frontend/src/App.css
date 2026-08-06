@@ -3,13 +3,41 @@
    Built on design tokens defined in src/index.css.
    ========================================================================== */
 
+/* ---- Component-local tokens ----
+   Small derived values used only within this stylesheet (glass-surface
+   tints and the select chevron icon). Kept local rather than in the
+   global token file since nothing outside this component needs them. */
+
+:root {
+  --glass-surface: rgba(16, 26, 46, 0.72);
+  --glass-sheen: rgba(238, 241, 247, 0.05);
+  --glass-sheen-strong: rgba(238, 241, 247, 0.06);
+  --dropzone-tint: rgba(238, 241, 247, 0.02);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239aa5bd' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
 .page {
+  position: relative;
   max-width: 880px;
   margin: 0 auto;
   padding: var(--space-8) var(--space-4) var(--space-16);
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
+}
+
+/* Soft ambient glow behind the glass cards. Purely decorative, fixed to the
+   viewport so it doesn't affect layout or scroll with the page content. */
+.page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(480px circle at 15% 0%, var(--color-primary-muted), transparent 60%),
+    radial-gradient(420px circle at 85% 20%, var(--color-warning-muted), transparent 60%);
+  opacity: 0.5;
 }
 
 /* ---- Hero ---- */
@@ -39,10 +67,26 @@
   flex-direction: column;
   gap: var(--space-6);
   padding: var(--space-8);
-  background: var(--color-surface);
+  background: var(--glass-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
+  box-shadow:
+    var(--shadow-lg),
+    inset 0 1px 0 var(--glass-sheen);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.card:hover {
+  border-color: var(--color-border-strong);
+  box-shadow:
+    var(--shadow-xl),
+    inset 0 1px 0 var(--glass-sheen-strong);
+  transform: translateY(-2px);
 }
 
 /* ---- Upload fieldset (disabled during loading) ---- */
@@ -68,7 +112,7 @@
   padding: var(--space-10) var(--space-6);
   text-align: center;
   cursor: pointer;
-  background: rgba(238, 241, 247, 0.02);
+  background: var(--dropzone-tint);
   border: 2px dashed var(--color-border-strong);
   border-radius: var(--radius-lg);
   transition:
@@ -193,34 +237,53 @@
 /* ---- Patient fields ---- */
 
 .patient-fields {
-  display: flex;
-  gap: var(--space-4);
-  justify-content: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-5) var(--space-6);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
   text-align: left;
 }
 
 .field label {
   font-size: var(--text-sm);
+  font-weight: var(--font-medium);
   color: var(--color-text-muted);
 }
 
 .field input,
 .field select {
-  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  height: 44px;
+  padding: 0 var(--space-3);
   font-family: var(--font-body);
   font-size: var(--text-base);
   color: var(--color-text-primary);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  transition: border-color var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.field select {
+  appearance: none;
+  padding-right: var(--space-8);
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: 14px;
+  cursor: pointer;
+}
+
+.field input:hover,
+.field select:hover {
+  border-color: var(--color-border-strong);
 }
 
 .field input:focus,
@@ -228,6 +291,28 @@
   outline: none;
   border-color: var(--color-primary);
   box-shadow: var(--shadow-focus);
+}
+
+.field-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
+
+.field-error {
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+}
+
+.field--error label {
+  color: var(--color-danger);
+}
+
+.field--error input {
+  border-color: var(--color-danger);
+}
+
+.field--error input:focus {
+  box-shadow: 0 0 0 3px var(--color-danger-muted);
 }
 
 /* ---- Predict button ---- */
@@ -250,10 +335,16 @@
 
 .predict-button:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .predict-button:active:not(:disabled) {
   transform: scale(0.98);
+}
+
+.predict-button:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
 }
 
 .predict-button:disabled {
@@ -392,6 +483,21 @@
 
 /* ---- Result card ---- */
 
+.result-card {
+  animation: card-enter 0.5s var(--ease-standard) both;
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .result-images {
   display: flex;
   gap: var(--space-6);
@@ -411,6 +517,11 @@
   height: 220px;
   object-fit: cover;
   border-radius: var(--radius-lg);
+  transition: transform var(--transition-base);
+}
+
+.result-image-block:hover .result-image {
+  transform: scale(1.03);
 }
 
 .result-heading {
@@ -419,11 +530,96 @@
   color: var(--color-text-primary);
 }
 
-.confidence {
-  margin: 0;
-  font-size: var(--text-xl);
+.card-divider {
+  height: 1px;
+  background: var(--color-border);
+  border: none;
+}
+
+/* ---- Clinical risk color groups ----
+   Shared by the prediction summary and each probability row so their
+   accent color, badge, and bar fill all stay in sync. */
+
+.risk-high {
+  --risk-color: var(--color-danger);
+  --risk-muted: var(--color-danger-muted);
+}
+
+.risk-medium {
+  --risk-color: var(--color-warning);
+  --risk-muted: var(--color-warning-muted);
+}
+
+.risk-low {
+  --risk-color: var(--color-primary);
+  --risk-muted: var(--color-primary-muted);
+}
+
+/* ---- Prediction summary ---- */
+
+.prediction-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  text-align: center;
+  background: var(--risk-muted);
+  border: 1px solid var(--risk-color);
+  border-radius: var(--radius-lg);
+  animation: card-enter 0.6s var(--ease-standard) both;
+  animation-delay: 100ms;
+}
+
+.prediction-badge {
+  padding: 2px 10px;
+  font-family: var(--font-heading);
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
-  color: var(--color-primary);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--risk-color);
+  background: var(--color-surface);
+  border: 1px solid var(--risk-color);
+  border-radius: var(--radius-full);
+}
+
+.prediction-name {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  color: var(--color-text-primary);
+}
+
+.prediction-code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-wide);
+}
+
+.confidence {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.confidence-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  color: var(--risk-color);
+}
+
+/* ---- Probability bars ---- */
+
+.probabilities-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .probabilities-list {
@@ -435,14 +631,100 @@
   list-style: none;
 }
 
-.probabilities-list li {
+.probability-row {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  animation: row-slide-in 0.4s var(--ease-standard) both;
+  animation-delay: calc(var(--row-index, 0) * 70ms);
+  transition: border-color var(--transition-fast);
+}
+
+.probability-row:hover {
+  border-color: var(--color-border-strong);
+}
+
+.probability-row--top {
+  background: var(--risk-muted);
+  border-color: var(--risk-color);
+}
+
+.probability-row--top:hover {
+  border-color: var(--risk-color);
+}
+
+@keyframes row-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.probability-row-header {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  padding: var(--space-2) var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  background: var(--color-bg);
-  border-radius: var(--radius-sm);
+}
+
+.probability-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-wide);
+}
+
+.probability-value {
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+}
+
+.probability-top-badge {
+  padding: 1px 6px;
+  font-family: var(--font-heading);
+  font-size: 0.65rem;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--risk-color);
+  border: 1px solid var(--risk-color);
+  border-radius: var(--radius-full);
+}
+
+.probability-bar-track {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+.probability-bar-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: var(--risk-color);
+  border-radius: var(--radius-full);
+  animation: bar-grow 0.9s var(--ease-standard) both;
+  animation-delay: calc(var(--row-index, 0) * 70ms + 150ms);
+}
+
+@keyframes bar-grow {
+  from {
+    width: 0%;
+  }
+  to {
+    width: var(--bar-width, 0%);
+  }
 }
 
 /* ---- Responsive ---- */
@@ -455,6 +737,14 @@
 
   .card {
     padding: var(--space-5);
+    /* Blurring a large backdrop is costly on low-end mobile GPUs. */
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+  }
+
+  .card:hover {
+    /* Hover has no persistent meaning on touch; skip the lift. */
+    transform: none;
   }
 
   .hero-title {
@@ -466,8 +756,7 @@
   }
 
   .patient-fields {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
   }
 
   .result-images {
@@ -481,5 +770,64 @@
     max-width: 260px;
     height: auto;
     aspect-ratio: 1 / 1;
+  }
+
+  .prediction-name {
+    font-size: var(--text-xl);
+  }
+
+  .confidence-value {
+    font-size: var(--text-xl);
+  }
+}
+
+@media (max-width: 380px) {
+  .page {
+    padding: var(--space-5) var(--space-2) var(--space-8);
+  }
+
+  .card {
+    padding: var(--space-4);
+  }
+
+  .hero-title {
+    font-size: var(--text-2xl);
+  }
+}
+
+/* ---- Reduced motion ----
+   The global rule in index.css already collapses every animation and
+   transition duration to near-zero; these overrides make that explicit
+   for the effects introduced in this stylesheet and remove the transform-
+   based hover/entrance movement entirely rather than just speeding it up. */
+
+@media (prefers-reduced-motion: reduce) {
+  .card:hover,
+  .result-image-block:hover .result-image {
+    transform: none;
+  }
+
+  .result-card,
+  .prediction-summary,
+  .probability-row,
+  .probability-bar-fill {
+    animation: none;
+  }
+
+  .scan-line,
+  .loading-scan-line {
+    animation: none;
+  }
+
+  .stage-item--active .stage-dot,
+  .stage-item--looping .stage-dot {
+    animation: none;
+    /* Without the spin, a transparent top border reads as a rendering
+       glitch rather than a spinner — fall back to a plain solid ring. */
+    border-top-color: var(--color-primary);
+  }
+
+  .probability-bar-fill {
+    width: var(--bar-width, 0%);
   }
 }
