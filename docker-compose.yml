@@ -1,0 +1,61 @@
+# =============================================
+# Cancer Fusion AI - docker-compose.yml
+# Development and production deployment configuration
+# =============================================
+
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data:ro
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - DATA_PATH=/app/data
+      - PYTHONPATH=/app/src
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Optional: Training service for retraining models
+  trainer:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - DATA_PATH=/app/data
+      - PYTHONPATH=/app/src
+    command: >
+      sh -c "python -m src.train --config configs/config.yaml"
+    # Uncomment to run training automatically on startup
+    # profiles: ["train"]
+
+  # Optional: Monitoring with Prometheus and Grafana (uncomment to enable)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #   depends_on:
+  #     - api
+  #
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./monitoring/grafana:/var/lib/grafana
+  #     - ./monitoring/dashboards:/etc/grafana/provisioning/dashboards
+  #   depends_on:
+  #     - prometheus
