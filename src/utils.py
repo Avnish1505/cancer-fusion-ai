@@ -86,12 +86,28 @@ def load_checkpoint(
     try:
         # Use strict=False to be more robust to minor architecture changes
         # if a layer is added/removed, it won't crash immediately.
-        model.load_state_dict(state_dict, strict=False)
+        result = model.load_state_dict(state_dict, strict=False)
     except RuntimeError as e:
         raise RuntimeError(
             f"Checkpoint architecture doesn't match current model — "
             f"did the backbone/num_classes change since this checkpoint was saved? Details: {e}"
         )
+
+    # strict=False silently swallows key/shape mismatches instead of raising —
+    # that's convenient for minor architecture drift, but it also means a
+    # checkpoint that doesn't match the model AT ALL (e.g. a stale checkpoint
+    # from a different architecture) would load with an untrained head and
+    # no error. Surface it explicitly so that failure mode is never silent.
+    if result.missing_keys or result.unexpected_keys:
+        print(
+            f"[load_checkpoint] WARNING: '{checkpoint_path}' loaded with "
+            f"{len(result.missing_keys)} missing key(s) and {len(result.unexpected_keys)} "
+            f"unexpected key(s) — some layers may be left at random initialization. "
+            f"missing={result.missing_keys[:5]}{'...' if len(result.missing_keys) > 5 else ''} "
+            f"unexpected={result.unexpected_keys[:5]}{'...' if len(result.unexpected_keys) > 5 else ''}"
+        )
+    else:
+        print(f"[load_checkpoint] '{checkpoint_path}' loaded cleanly: 0 missing keys, 0 unexpected keys.")
 
     if optimizer is not None and "optimizer_state_dict" in checkpoint:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
