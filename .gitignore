@@ -9,7 +9,9 @@ __pycache__/
 
 # Large model/data files
 # Inko Git LFS ya cloud storage par rakhna best hai
-models/*.pt
+# NOTE: models/best_model.pt IS tracked (via Git LFS, see .gitattributes) — it's
+# the actual deployed fusion checkpoint. best_model.pth is the stale Phase-1
+# (image-only) checkpoint and stays untracked/ignored on purpose.
 models/*.pth
 data/*.csv
 

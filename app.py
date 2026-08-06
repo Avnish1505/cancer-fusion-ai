@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from PIL import Image
 from sklearn.preprocessing import StandardScaler
 from src.config import load_config
-from src.dataset import DX_FULL_NAMES, DX_LABELS
+from src.dataset import DX_FULL_NAMES, DX_LABELS, load_metadata, stratified_split
 from src.model import build_model
 from src.transforms import get_eval_transforms
 from src.utils import get_device, load_checkpoint
@@ -41,14 +41,27 @@ config = load_config("configs/config.yaml")
 
 # ---- Recreate metadata encoding exactly as training did ----
 # NOTE: Yeh path aapke local setup ke hisaab se adjust karna pad sakta hai
-metadata_csv = pd.read_csv("data/HAM10000_metadata.csv")
-age_median = metadata_csv["age"].median()
-metadata_csv["age"] = metadata_csv["age"].fillna(age_median)
-age_scaler = StandardScaler()
-age_scaler.fit(metadata_csv[["age"]])
+# CRITICAL: the age scaler / median / one-hot columns must be fit on the SAME
+# train split training used (src/dataset.py's HAM10000Dataset does this and
+# reuses it for val/test to prevent leakage) — refitting on the full CSV here
+# would silently drift from what the checkpoint was actually trained on.
+full_metadata_csv = load_metadata("data/HAM10000_metadata.csv")
+train_metadata_df, _, _ = stratified_split(
+    full_metadata_csv,
+    config["data"]["train_split"],
+    config["data"]["val_split"],
+    config["data"]["test_split"],
+    config["data"]["random_seed"],
+)
 
-sex_dummies = pd.get_dummies(metadata_csv["sex"].fillna("unknown"), prefix="sex", dtype=float)
-loc_dummies = pd.get_dummies(metadata_csv["localization"].fillna("unknown"), prefix="loc", dtype=float)
+age_median = train_metadata_df["age"].median()
+train_metadata_df = train_metadata_df.copy()
+train_metadata_df["age"] = train_metadata_df["age"].fillna(age_median)
+age_scaler = StandardScaler()
+age_scaler.fit(train_metadata_df[["age"]])
+
+sex_dummies = pd.get_dummies(train_metadata_df["sex"].fillna("unknown"), prefix="sex", dtype=float)
+loc_dummies = pd.get_dummies(train_metadata_df["localization"].fillna("unknown"), prefix="loc", dtype=float)
 metadata_columns = ["age_scaled"] + list(sex_dummies.columns) + list(loc_dummies.columns)
 
 # --- CRITICAL: Dynamically set metadata_dim before building the model ---
