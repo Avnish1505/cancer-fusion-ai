@@ -1,0 +1,15 @@
+.git
+__pycache__/
+*.pyc
+notebooks/
+tests/
+frontend/
+node_modules/
+*.log
+.venv/
+venv/
+
+# NOTE: models/ and data/HAM10000_metadata.csv are intentionally NOT excluded —
+# the Cloud Run Dockerfile COPYs models/best_model.pt and
+# data/HAM10000_metadata.csv explicitly at build time (no volume mounts on
+# Cloud Run). Do not add models/ or data/ here.

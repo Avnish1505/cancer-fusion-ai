@@ -104,7 +104,7 @@ def build_model(config: dict) -> CancerImageClassifier:
     model = CancerImageClassifier(
         backbone=model_cfg.get("backbone", "resnet50"),
         num_classes=model_cfg["num_classes"],
-        pretrained=model_cfg.get("pretrained", True),
+        pretrained=model_cfg.get("pretrained", False),
         dropout=model_cfg.get("dropout", 0.3),
         use_metadata=train_cfg.get("use_metadata", False),
         metadata_dim=model_cfg.get("metadata_dim", 0),
