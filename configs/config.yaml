@@ -17,18 +17,19 @@ data:
 
 model:
   backbone: "resnet50"        # options: resnet50, efficientnet_b0
-  pretrained: true
+  pretrained: false            # served checkpoint fully covers state_dict (Gate 1: 0 missing keys) — ImageNet download was fetched then immediately overwritten, pure wasted cold-start network I/O
   num_classes: 7               # HAM10000 has 7 diagnostic categories
   dropout: 0.3
 
 train:
   image_size: 224
   batch_size: 32
-  num_epochs: 20
-  learning_rate: 0.0003
+  num_epochs: 50
+  learning_rate: 0.0001
   weight_decay: 0.0001
-  early_stopping_patience: 5
+  early_stopping_patience: 10
   use_class_weights: true      # HAM10000 is heavily imbalanced (nv class dominates)
+  use_metadata: true           # fusion model: age/sex/localization fused with image features
   num_workers: 2
   device: "cuda"                # falls back to cpu automatically if unavailable
 
@@ -39,18 +40,3 @@ paths:
 
 logging:
   log_every_n_steps: 20
-# ... baaki sabhi settings ...
-
-train:
-  image_size: 224
-  batch_size: 32
-  num_epochs: 50
-  learning_rate: 0.0001
-  weight_decay: 0.0001
-  early_stopping_patience: 10
-  use_class_weights: true
-  use_metadata: true    # <<<--- YEH LINE ADD YA UNCOMMENT KAREIN
-  num_workers: 2
-  device: "cuda"
-
-# ... baaki sabhi settings ...
