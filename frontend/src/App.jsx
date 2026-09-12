@@ -1,29 +1,7 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import './App.css'
 
-const API_BASE_URL = "https://cancer-fusion-ai-production.up.railway.app"
-
-const LOADING_STAGES = [
-  'Preprocessing image',
-  'Running model inference',
-  'Generating Grad-CAM heatmap',
-  'Finalizing report',
-]
-const STAGE_INTERVAL_MS = 1500
-
-// Coarse clinical risk grouping for HAM10000 diagnosis codes, used only to
-// color-code the presentation (does not affect the prediction itself).
-const RISK_BY_CLASS = {
-  mel: 'high',
-  bcc: 'high',
-  akiec: 'high',
-  bkl: 'medium',
-  nv: 'low',
-  df: 'low',
-  vasc: 'low',
-}
-
-const getRiskLevel = (className) => RISK_BY_CLASS[className?.toLowerCase()] || 'medium'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://cancer-fusion-ai-production.up.railway.app'
 
 const LOCALIZATION_OPTIONS = [
   { value: 'back', label: 'Back' },
@@ -43,6 +21,16 @@ const LOCALIZATION_OPTIONS = [
   { value: 'unknown', label: 'Unknown' },
 ]
 
+// Display labels for the response's timings_ms keys — a factual, post-hoc
+// breakdown, not a progress simulation. Order here is the render order.
+const TIMING_LABELS = [
+  ['image_decode', 'Image decode'],
+  ['preprocess', 'Preprocess'],
+  ['forward_and_backward', 'Forward + backward pass'],
+  ['heatmap_render', 'Heatmap render'],
+  ['serialize', 'Serialize response'],
+]
+
 // Client-side only: keeps invalid/empty ages from being submitted.
 // Does not change what gets sent to the API when valid.
 const getAgeError = (value) => {
@@ -53,11 +41,22 @@ const getAgeError = (value) => {
   return null
 }
 
+function SectionHeader({ number, label, helper }) {
+  return (
+    <div className="section-header">
+      <span className="section-heading">
+        <span className="section-number">{number}</span>
+        {label}
+      </span>
+      <span className="section-helper">{helper}</span>
+    </div>
+  )
+}
+
 function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [loadingStage, setLoadingStage] = useState(0)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [age, setAge] = useState(50)
@@ -65,13 +64,6 @@ function App() {
   const [localization, setLocalization] = useState('back')
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef(null)
-  const stageIntervalRef = useRef(null)
-
-  useEffect(() => {
-    return () => {
-      if (stageIntervalRef.current) clearInterval(stageIntervalRef.current)
-    }
-  }, [])
 
   const processFile = (file) => {
     if (!file) return
@@ -117,10 +109,6 @@ function App() {
     }
     setLoading(true)
     setError(null)
-    setLoadingStage(0)
-    stageIntervalRef.current = setInterval(() => {
-      setLoadingStage((prev) => (prev < LOADING_STAGES.length - 1 ? prev + 1 : prev))
-    }, STAGE_INTERVAL_MS)
 
     try {
       const formData = new FormData()
@@ -140,10 +128,7 @@ function App() {
     } catch (err) {
       setError(err.message || 'Kuch galat ho gaya, backend check karo')
     } finally {
-      clearInterval(stageIntervalRef.current)
-      stageIntervalRef.current = null
       setLoading(false)
-      setLoadingStage(0)
     }
   }
 
@@ -152,205 +137,247 @@ function App() {
     return Object.entries(result.all_probabilities).sort(([, a], [, b]) => b - a)
   }, [result])
 
+  const statusText = loading ? 'Running' : error ? 'Error' : result ? 'Complete' : 'Idle'
+
   return (
     <div className="page">
-      <header className="hero">
-        <h1 className="hero-title">🔬 Cancer Fusion AI</h1>
-        <p className="hero-subtitle">Skin Lesion Classifier — HAM10000 Dataset</p>
-      </header>
-
-      <main className="card upload-card">
-        <fieldset className="upload-fields" disabled={loading}>
-          <div
-            className={`dropzone${isDragging ? ' dropzone--active' : ''}${preview ? ' dropzone--has-preview' : ''}${loading ? ' dropzone--disabled' : ''}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => {
-              if (loading) return
-              fileInputRef.current?.click()
-            }}
-            onKeyDown={(e) => {
-              if (loading) return
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                fileInputRef.current?.click()
-              }
-            }}
-            role="button"
-            tabIndex={loading ? -1 : 0}
-            aria-disabled={loading}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="dropzone-input"
-              aria-label="Upload lesion image"
-              tabIndex={-1}
-            />
-            {preview ? (
-              <div className="preview-wrap">
-                <div className={`preview-scan${loading ? ' preview-scan--active' : ''}`}>
-                  <img src={preview} alt="Selected lesion" className="preview-image" />
-                  {loading && <span className="scan-line" aria-hidden="true" />}
-                </div>
-                <span className="preview-hint">
-                  {loading ? 'Analyzing image…' : 'Click or drop to replace image'}
-                </span>
-              </div>
-            ) : (
-              <div className="dropzone-empty">
-                <div className="dropzone-icon" aria-hidden="true">📤</div>
-                <p className="dropzone-title">Drag &amp; drop a lesion image</p>
-                <p className="dropzone-subtitle">or click to browse — JPG, PNG</p>
-              </div>
-            )}
+      <div className="sheet">
+        <header className="sheet-header">
+          <div className="sheet-header-left">
+            <span className="product-name">Cancer Fusion AI</span>
+            <span className="product-descriptor">Skin lesion classifier — HAM10000</span>
           </div>
+          <span className={`sheet-status sheet-status--${statusText.toLowerCase()}`}>{statusText}</span>
+        </header>
+        <hr className="header-rule" />
 
-          <div className="patient-fields">
-            <div className={`field${ageError ? ' field--error' : ''}`}>
-              <label htmlFor="age">Age</label>
-              <input
-                id="age"
-                type="number"
-                inputMode="numeric"
-                min="0"
-                max="120"
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
-                aria-invalid={Boolean(ageError)}
-                aria-describedby={ageError ? 'age-error' : undefined}
-              />
-              {ageError ? (
-                <span className="field-error" id="age-error" role="alert">
-                  {ageError}
-                </span>
-              ) : (
-                <span className="field-hint">Years, 0–120</span>
-              )}
-            </div>
-
-            <div className="field">
-              <label htmlFor="sex">Sex</label>
-              <select id="sex" value={sex} onChange={(e) => setSex(e.target.value)}>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="unknown">Unknown</option>
-              </select>
-            </div>
-
-            <div className="field">
-              <label htmlFor="localization">Lesion Location</label>
-              <select id="localization" value={localization} onChange={(e) => setLocalization(e.target.value)}>
-                {LOCALIZATION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {preview && (
-            <button className="predict-button" onClick={handlePredict} disabled={loading}>
-              {loading ? 'Analyzing…' : 'Predict'}
-            </button>
-          )}
-        </fieldset>
-
-        {error && <p className="error-message">{error}</p>}
-      </main>
-
-      {loading && (
-        <section className="card loading-card" role="status" aria-live="polite" aria-busy="true">
-          <div className="loading-scan" aria-hidden="true">
-            <span className="loading-scan-line" />
-          </div>
-          <ul className="stage-list">
-            {LOADING_STAGES.map((stage, index) => {
-              const isComplete = index < loadingStage
-              const isActive = index === loadingStage
-              const isFinalActive = isActive && index === LOADING_STAGES.length - 1
-              return (
-                <li
-                  key={stage}
-                  className={`stage-item${isComplete ? ' stage-item--complete' : ''}${isActive ? ' stage-item--active' : ''}${isFinalActive ? ' stage-item--looping' : ''}`}
-                >
-                  <span className="stage-dot" aria-hidden="true" />
-                  <span className="stage-label">{stage}</span>
-                </li>
-              )
-            })}
-          </ul>
-          <p className="sr-only">
-            Step {loadingStage + 1} of {LOADING_STAGES.length}: {LOADING_STAGES[loadingStage]}
-          </p>
-        </section>
-      )}
-
-      {result && (
-        <section className="card result-card">
-          <div className="result-images">
-            {preview && (
-              <div className="result-image-block">
-                <h4 className="result-heading">Original Image</h4>
-                <img src={preview} alt="Original lesion" className="result-image" />
-              </div>
-            )}
-            {result?.gradcam_overlay_base64 && (
-              <div className="result-image-block">
-                <h4 className="result-heading">Grad-CAM Overlay</h4>
-                <img
-                  src={`data:image/png;base64,${result.gradcam_overlay_base64}`}
-                  alt="Grad-CAM Overlay"
-                  className="result-image"
+        {/* ---- Section 01 — Input ---- */}
+        <section className="report-section">
+          <SectionHeader
+            number="01"
+            label="INPUT"
+            helper="Upload a dermoscopic image and patient details, then run the model."
+          />
+          <div className="section-box input-box">
+            <div className="input-col input-col--dropzone">
+              <div
+                className={`dropzone${isDragging ? ' dropzone--active' : ''}${loading ? ' dropzone--disabled' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => {
+                  if (loading) return
+                  fileInputRef.current?.click()
+                }}
+                onKeyDown={(e) => {
+                  if (loading) return
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    fileInputRef.current?.click()
+                  }
+                }}
+                role="button"
+                tabIndex={loading ? -1 : 0}
+                aria-disabled={loading}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="dropzone-input"
+                  aria-label="Upload lesion image"
+                  tabIndex={-1}
                 />
+                {selectedFile ? (
+                  <div className="dropzone-filled">
+                    <span className="dropzone-filename">{selectedFile.name}</span>
+                    <span className="dropzone-hint">click or drop to replace</span>
+                  </div>
+                ) : (
+                  <div className="dropzone-empty">
+                    <p className="dropzone-title">Drop a lesion image here</p>
+                    <p className="dropzone-subtitle">or click to browse — JPG, PNG</p>
+                  </div>
+                )}
               </div>
+              <p className="input-col-helper">Used only for this prediction. Not stored.</p>
+            </div>
+
+            <div className="input-col input-col--fields">
+              <div className="field">
+                <label htmlFor="age">AGE</label>
+                <input
+                  id="age"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  max="120"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  aria-invalid={Boolean(ageError)}
+                  aria-describedby={ageError ? 'age-error' : undefined}
+                />
+                {ageError ? (
+                  <span className="field-error" id="age-error" role="alert">
+                    {ageError}
+                  </span>
+                ) : (
+                  <span className="field-hint">years, 0–120</span>
+                )}
+              </div>
+
+              <div className="field">
+                <label htmlFor="sex">SEX</label>
+                <select id="sex" value={sex} onChange={(e) => setSex(e.target.value)}>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="input-col input-col--fields">
+              <div className="field">
+                <label htmlFor="localization">LESION LOCATION</label>
+                <select
+                  id="localization"
+                  value={localization}
+                  onChange={(e) => setLocalization(e.target.value)}
+                >
+                  {LOCALIZATION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="input-col input-col--predict">
+              <button className="predict-button" onClick={handlePredict} disabled={loading || !selectedFile}>
+                {loading ? 'Analyzing…' : 'Predict'}
+              </button>
+            </div>
+          </div>
+          {error && (
+            <p className="error-message" role="alert">
+              {error}
+            </p>
+          )}
+        </section>
+
+        {/* ---- Section 02 — Evidence ---- */}
+        <section className="report-section">
+          <SectionHeader
+            number="02"
+            label="EVIDENCE"
+            helper="What the model saw, and where it looked."
+          />
+          <div className="section-box evidence-box">
+            {result ? (
+              <>
+                <div className="evidence-images">
+                  <div className="evidence-image-block">
+                    <span className="evidence-image-label">Original</span>
+                    {preview && <img src={preview} alt="Original lesion" className="evidence-image" />}
+                  </div>
+                  <div className="evidence-image-block">
+                    <span className="evidence-image-label">Grad-CAM heatmap</span>
+                    {result.gradcam_overlay_base64 && (
+                      <img
+                        src={`data:image/png;base64,${result.gradcam_overlay_base64}`}
+                        alt="Grad-CAM heatmap overlay"
+                        className="evidence-image"
+                      />
+                    )}
+                  </div>
+                </div>
+                <p className="evidence-explanation">
+                  The heatmap marks the regions of the image that most influenced the model's prediction —
+                  warmer areas contributed more.
+                </p>
+                {result.timings_ms && (
+                  <div className="timings">
+                    <span className="timings-label">LATENCY (ms)</span>
+                    <ul className="timings-list">
+                      {TIMING_LABELS.filter(([key]) => key in result.timings_ms).map(([key, label]) => (
+                        <li key={key} className="timings-row">
+                          <span className="timings-name">{label}</span>
+                          <span className="timings-value">{result.timings_ms[key].toFixed(1)}</span>
+                        </li>
+                      ))}
+                      <li className="timings-row timings-row--total">
+                        <span className="timings-name">Total</span>
+                        <span className="timings-value">
+                          {Object.values(result.timings_ms)
+                            .reduce((sum, v) => sum + v, 0)
+                            .toFixed(1)}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="empty-state">
+                The original image, Grad-CAM heatmap, and per-stage latency will appear here after a run.
+              </p>
             )}
           </div>
+        </section>
 
-          <div className={`prediction-summary risk-${getRiskLevel(result.prediction)}`}>
-            <span className="prediction-badge">Top Prediction</span>
-            <h3 className="prediction-name">{result.prediction_full_name}</h3>
-            <p className="prediction-code">{result.prediction.toUpperCase()}</p>
-            <p className="confidence">
-              Confidence <span className="confidence-value">{(result.confidence * 100).toFixed(2)}%</span>
-            </p>
-          </div>
-
-          <div className="card-divider" />
-
-          <div className="probabilities-section">
-            <h4 className="result-heading">All Probabilities</h4>
-            <ul className="probabilities-list">
-              {sortedProbabilities.map(([name, prob], index) => {
-                const isTop = index === 0
-                const risk = getRiskLevel(name)
-                return (
-                  <li
-                    key={name}
-                    className={`probability-row risk-${risk}${isTop ? ' probability-row--top' : ''}`}
-                    style={{ '--bar-width': `${(prob * 100).toFixed(2)}%`, '--row-index': index }}
-                  >
-                    <div className="probability-row-header">
-                      <span className="probability-name">
-                        {name.toUpperCase()}
-                        {isTop && <span className="probability-top-badge">Top match</span>}
-                      </span>
-                      <span className="probability-value">{(prob * 100).toFixed(2)}%</span>
-                    </div>
-                    <div className="probability-bar-track">
-                      <div className="probability-bar-fill" />
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+        {/* ---- Section 03 — Result ---- */}
+        <section className="report-section">
+          <SectionHeader
+            number="03"
+            label="RESULT"
+            helper="What the model produced — not a diagnosis."
+          />
+          <div className={`section-box result-box${result ? ' result-box--filled' : ''}`}>
+            {result ? (
+              <>
+                <div className="top-prediction">
+                  <span className="top-prediction-label">Top prediction</span>
+                  <span className="top-prediction-name">{result.prediction_full_name}</span>
+                  <span className="top-prediction-code">{result.prediction.toUpperCase()}</span>
+                  <span className="top-prediction-confidence">
+                    {(result.confidence * 100).toFixed(2)}% calibrated confidence
+                  </span>
+                </div>
+                <div className="probabilities">
+                  <span className="probabilities-label">ALL 7 CLASSES</span>
+                  <ul className="probabilities-list">
+                    {sortedProbabilities.map(([name, prob]) => (
+                      <li key={name} className="probability-row">
+                        <span className="probability-name">{name.toUpperCase()}</span>
+                        <span className="probability-bar-track">
+                          <span
+                            className="probability-bar-fill"
+                            style={{ width: `${(prob * 100).toFixed(4)}%` }}
+                          />
+                        </span>
+                        <span className="probability-value">{(prob * 100).toFixed(2)}%</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            ) : (
+              <p className="empty-state">Prediction results will appear here after a run.</p>
+            )}
           </div>
         </section>
-      )}
+
+        <footer className="sheet-footer">
+          <span className="footer-meta">
+            MODEL: resnet50 fusion (image + metadata) · DATASET: HAM10000 · TEMPERATURE: 2.1235
+          </span>
+          <p className="footer-disclaimer">
+            Research prototype. Not a medical device. Not for clinical or diagnostic use.
+          </p>
+        </footer>
+      </div>
     </div>
   )
 }

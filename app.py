@@ -105,7 +105,10 @@ transform = get_eval_transforms(config["train"]["image_size"])
 # genuinely overconfident (NV is ~67% of HAM10000's training data), so
 # raw logits routinely saturate softmax to ~100%/0%. T>1 softens the
 # displayed probability distribution without changing the prediction.
-TEMPERATURE = 2.5
+# Fitted (not guessed) via NLL minimization on the validation set —
+# see src/calibrate.py, which reports T=1.0/2.5/fitted side by side on
+# the held-out test set (ECE/MCE/NLL) before this value was adopted.
+TEMPERATURE = 2.1235
 
 
 class FusionGradCAM:
