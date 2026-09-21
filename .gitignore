@@ -21,6 +21,12 @@ frontend/dist/
 frontend/.pnp
 frontend/.pnp.js
 
+# Raw feature cache used only to fit Mahalanobis OOD params offline (98MB,
+# mostly reports/ood/cache/train.pt's 6,979 x 2048-d features) — the served
+# app only needs models/mahalanobis_params.npz, which is committed (via LFS).
+# Re-run `python -m src.ood` to regenerate this cache if needed.
+reports/ood/cache/
+
 # Test artifacts and logs
 /tmp/ham10000_*
 .npm/_logs/
