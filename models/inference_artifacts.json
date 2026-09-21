@@ -1,0 +1,56 @@
+{
+  "checkpoint_path": "models/best_model.pt",
+  "checkpoint_sha256": "0d6b5e714cb3cbbe0ca820d4889c5356efbc24fc98a636fabe9785297b57cf16",
+  "class_order": [
+    "akiec",
+    "bcc",
+    "bkl",
+    "df",
+    "mel",
+    "nv",
+    "vasc"
+  ],
+  "temperature": 2.1235177516937256,
+  "conformal": {
+    "method": "mondrian_lac",
+    "alpha": 0.1,
+    "calibrated_on": "internal_validation_only",
+    "per_class_qhat": {
+      "akiec": 0.9927533268928528,
+      "bcc": 0.8849982023239136,
+      "bkl": 0.9171766042709351,
+      "df": 0.9496416449546814,
+      "mel": 0.919619083404541,
+      "nv": 0.7492048144340515,
+      "vasc": 0.8784216642379761
+    }
+  },
+  "malignant_rule": {
+    "classes": [
+      "mel",
+      "bcc",
+      "akiec"
+    ],
+    "calibrated_on": "internal_validation_only",
+    "thresholds": {
+      "sensitivity_90": {
+        "target": 0.9,
+        "threshold": 0.17333368957042694,
+        "achieved_val_sensitivity": 0.9037656903765691
+      },
+      "sensitivity_95": {
+        "target": 0.95,
+        "threshold": 0.07211162894964218,
+        "achieved_val_sensitivity": 0.9539748953974896
+      }
+    }
+  },
+  "ood_guard": {
+    "method": "mahalanobis_ledoit_wolf",
+    "calibrated_on": "internal_validation_only",
+    "val_accept_rate_target": 0.95,
+    "val_accept_rate_achieved": 0.9497655726724715,
+    "threshold": 4650.558099460426,
+    "means_precision_file": "mahalanobis_params.npz"
+  }
+}
