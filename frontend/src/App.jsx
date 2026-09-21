@@ -3,6 +3,18 @@ import './App.css'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://cancer-fusion-ai-production.up.railway.app'
 
+// Mirrors src/dataset.py's DX_FULL_NAMES — kept in sync manually, same as
+// LOCALIZATION_OPTIONS below.
+const DX_FULL_NAMES = {
+  akiec: "Actinic keratoses and intraepithelial carcinoma / Bowen's disease",
+  bcc: 'Basal cell carcinoma',
+  bkl: 'Benign keratosis-like lesions',
+  df: 'Dermatofibroma',
+  mel: 'Melanoma',
+  nv: 'Melanocytic nevi',
+  vasc: 'Vascular lesions',
+}
+
 const LOCALIZATION_OPTIONS = [
   { value: 'back', label: 'Back' },
   { value: 'lower extremity', label: 'Lower Extremity' },
@@ -137,7 +149,10 @@ function App() {
     return Object.entries(result.all_probabilities).sort(([, a], [, b]) => b - a)
   }, [result])
 
-  const statusText = loading ? 'Running' : error ? 'Error' : result ? 'Complete' : 'Idle'
+  const isRejected = result?.status === 'rejected'
+  const isAccepted = result?.status === 'ok'
+
+  const statusText = loading ? 'Running' : error ? 'Error' : isRejected ? 'Rejected' : result ? 'Complete' : 'Idle'
 
   return (
     <div className="page">
@@ -265,6 +280,10 @@ function App() {
               {error}
             </p>
           )}
+          <p className="upload-note">
+            This model was trained only on dermatoscope images, mostly of light skin. An ordinary
+            phone photo can pass the image check and still produce a meaningless result.
+          </p>
         </section>
 
         {/* ---- Section 02 — Evidence ---- */}
@@ -282,21 +301,29 @@ function App() {
                     <span className="evidence-image-label">Original</span>
                     {preview && <img src={preview} alt="Original lesion" className="evidence-image" />}
                   </div>
-                  <div className="evidence-image-block">
-                    <span className="evidence-image-label">Grad-CAM heatmap</span>
-                    {result.gradcam_overlay_base64 && (
-                      <img
-                        src={`data:image/png;base64,${result.gradcam_overlay_base64}`}
-                        alt="Grad-CAM heatmap overlay"
-                        className="evidence-image"
-                      />
-                    )}
-                  </div>
+                  {!isRejected && (
+                    <div className="evidence-image-block">
+                      <span className="evidence-image-label">Grad-CAM heatmap</span>
+                      {result.gradcam_overlay_base64 && (
+                        <img
+                          src={`data:image/png;base64,${result.gradcam_overlay_base64}`}
+                          alt="Grad-CAM heatmap overlay"
+                          className="evidence-image"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
-                <p className="evidence-explanation">
-                  The heatmap marks the regions of the image that most influenced the model's prediction —
-                  warmer areas contributed more.
-                </p>
+                {isRejected ? (
+                  <p className="evidence-explanation">
+                    No heatmap — the image was rejected before the classifier ran. See the Result section.
+                  </p>
+                ) : (
+                  <p className="evidence-explanation">
+                    The heatmap marks the regions of the image that most influenced the model's prediction —
+                    warmer areas contributed more.
+                  </p>
+                )}
                 {result.timings_ms && (
                   <div className="timings">
                     <span className="timings-label">LATENCY (ms)</span>
@@ -332,11 +359,50 @@ function App() {
           <SectionHeader
             number="03"
             label="RESULT"
-            helper="What the model produced — not a diagnosis."
+            helper="What the model produced — not medical advice."
           />
           <div className={`section-box result-box${result ? ' result-box--filled' : ''}`}>
-            {result ? (
+            {isRejected ? (
+              <p className="rejected-message" role="alert">
+                {result.message}
+              </p>
+            ) : isAccepted ? (
               <>
+                <div
+                  className={`malignant-flag${result.malignant.flagged ? ' malignant-flag--flagged' : ''}`}
+                >
+                  <span className="malignant-flag-label">MALIGNANT PATTERN CHECK</span>
+                  <span className="malignant-flag-text">
+                    {result.malignant.flagged
+                      ? 'Pattern associated with malignant lesions — worth showing to a dermatologist.'
+                      : 'No malignant pattern at this setting.'}
+                  </span>
+                  <span className="malignant-flag-operating-point">
+                    This check is tuned to catch about 95% of malignant lesions, at the cost of
+                    flagging many benign lesions too.
+                  </span>
+                </div>
+
+                <div className="plausible-diagnoses">
+                  <span className="plausible-diagnoses-label">CLASSES THE MODEL CAN'T RULE OUT</span>
+                  <ul className="plausible-diagnoses-list">
+                    {result.prediction_set.map((code) => (
+                      <li key={code} className="plausible-diagnoses-row">
+                        <span className="plausible-diagnoses-code">{code.toUpperCase()}</span>
+                        <span className="plausible-diagnoses-name">
+                          {DX_FULL_NAMES[code] ?? code}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {result.prediction_set.length > 1 && (
+                    <p className="plausible-diagnoses-note">
+                      The model could not narrow this down to a single class at its target
+                      confidence level.
+                    </p>
+                  )}
+                </div>
+
                 <div className="top-prediction">
                   <span className="top-prediction-label">Top prediction</span>
                   <span className="top-prediction-name">{result.prediction_full_name}</span>
@@ -371,7 +437,7 @@ function App() {
 
         <footer className="sheet-footer">
           <span className="footer-meta">
-            MODEL: resnet50 fusion (image + metadata) · DATASET: HAM10000 · TEMPERATURE: 2.1235
+            MODEL: resnet50 fusion (image + metadata) · DATASET: HAM10000
           </span>
           <p className="footer-disclaimer">
             Research prototype. Not a medical device. Not for clinical or diagnostic use.

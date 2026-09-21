@@ -1,0 +1,58 @@
+[
+  {
+    "file": "stripes_088.png",
+    "predicted_class": "nv",
+    "msp": 0.2889880836009979,
+    "energy": -2.535141706466675,
+    "mahalanobis": 44128.201936956655
+  },
+  {
+    "file": "solid_017.png",
+    "predicted_class": "vasc",
+    "msp": 0.5059213042259216,
+    "energy": -3.5926833152770996,
+    "mahalanobis": 45789.6732607024
+  },
+  {
+    "file": "solid_032.png",
+    "predicted_class": "nv",
+    "msp": 0.3058544099330902,
+    "energy": -2.3251476287841797,
+    "mahalanobis": 19519.68701525387
+  },
+  {
+    "file": "solid_010.png",
+    "predicted_class": "nv",
+    "msp": 0.27502545714378357,
+    "energy": -2.2262744903564453,
+    "mahalanobis": 35977.563026546544
+  },
+  {
+    "file": "stripes_086.png",
+    "predicted_class": "nv",
+    "msp": 0.9239187836647034,
+    "energy": -8.16169548034668,
+    "mahalanobis": 194416.25428608587
+  },
+  {
+    "file": "noise_uniform_035.png",
+    "predicted_class": "nv",
+    "msp": 0.4816441237926483,
+    "energy": -5.972426414489746,
+    "mahalanobis": 44174.82087361319
+  },
+  {
+    "file": "checker_084.png",
+    "predicted_class": "nv",
+    "msp": 0.23887565732002258,
+    "energy": -2.2932257652282715,
+    "mahalanobis": 39208.66298569391
+  },
+  {
+    "file": "solid_020.png",
+    "predicted_class": "nv",
+    "msp": 0.3946877419948578,
+    "energy": -2.9293508529663086,
+    "mahalanobis": 12962.699219096787
+  }
+]
