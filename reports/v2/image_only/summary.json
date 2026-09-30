@@ -1,0 +1,23 @@
+{
+  "run": "image_only",
+  "best_epoch": 15,
+  "tta_views": 8,
+  "val": {
+    "accuracy": 0.8727394507702613,
+    "balanced_accuracy": 0.7696198444117233,
+    "macro_f1": 0.7632041462415945,
+    "mel_recall": 0.7295081967213115,
+    "mel_precision": 0.52046783625731,
+    "mel_auc": 0.9406798914278198,
+    "malignant_auc": 0.9474852021647882
+  },
+  "test": {
+    "accuracy": 0.8548282566429034,
+    "balanced_accuracy": 0.7200452422952273,
+    "macro_f1": 0.7430841971563084,
+    "mel_recall": 0.7386363636363636,
+    "mel_precision": 0.5531914893617021,
+    "mel_auc": 0.9382398417237482,
+    "malignant_auc": 0.9524598002858873
+  }
+}
