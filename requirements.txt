@@ -3,6 +3,7 @@ uvicorn
 python-multipart
 torch
 torchvision
+timm
 pandas
 numpy
 scikit-learn
