@@ -301,7 +301,7 @@ AUCs in this table use plain softmax for both models, which is why v1's differ s
 What this shows and what it doesn't:
 
 - v1 lost 7 points going from its internal test set to ISIC 2018 (0.722 to 0.653). v2 fusion doesn't lose anything (0.762 to 0.782).
-- The gap to the best 2018 submission (0.885) shrinks from about 23 points to about 10. v2 is a single model with no extra training data; most top 2018 entries were ensembles.
+- The gap to the best 2018 submission (0.885) shrinks from about 23 points to about 10. v2 is a single model with no extra training data; the winning 2018 entry averaged ten models.
 - Melanoma recall does not improve significantly in any run. The AUCs do.
 - Training-seed variance is not measured yet. The paired CIs cover test-set sampling noise only. A second fusion run (`reports/v2/fusion_seed1`) was interrupted before training finished; its best early checkpoint still scored 0.750 balanced accuracy and 0.950 melanoma AUC on ISIC 2018, but it is not a finished replicate.
 
