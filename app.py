@@ -37,7 +37,7 @@ PROCESS_START = time.time()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://cancer-fusion-ai.vercel.app",  # Vercel URL ke liye isko update karna padega
+        "https://cancer-fusion-ai.vercel.app",  # update if the frontend is deployed elsewhere
         "http://localhost:5173",  # local Vite dev server
         "http://127.0.0.1:5173",  # local Vite dev server (127.0.0.1 form)
     ],
@@ -113,7 +113,6 @@ REJECTION_MESSAGE = (
 
 
 # ---- Recreate metadata encoding exactly as training did ----
-# NOTE: Yeh path aapke local setup ke hisaab se adjust karna pad sakta hai
 # CRITICAL: the age scaler / median / one-hot columns must be fit on the SAME
 # train split training used (src/dataset.py's HAM10000Dataset does this and
 # reuses it for val/test to prevent leakage) — refitting on the full CSV here
@@ -146,7 +145,7 @@ load_checkpoint(CHECKPOINT_PATH, model, device=device)
 model.eval()
 model.to(device)
 
-def encode_metadata(age: float, sex: str, localization: str):
+def encode_metadata(age: float | None, sex: str, localization: str):
     age_val = age if age is not None else age_median
     age_scaled = age_scaler.transform([[age_val]])[0][0]
 
@@ -163,6 +162,37 @@ def encode_metadata(age: float, sex: str, localization: str):
     return torch.tensor([vector], dtype=torch.float32).to(device)
 
 transform = get_eval_transforms(config["train"]["image_size"])
+
+# Categories the checkpoint was actually trained on. Anything else used to be
+# silently encoded as an all-zero one-hot row, a combination the model never
+# saw in training, and still returned a confident-looking prediction.
+KNOWN_SEX = sorted(c[len("sex_"):] for c in metadata_columns if c.startswith("sex_"))
+KNOWN_LOCALIZATION = sorted(c[len("loc_"):] for c in metadata_columns if c.startswith("loc_"))
+UNKNOWN_AGE_TOKENS = {"", "unknown"}
+
+
+def parse_metadata_form(age_raw: str, sex_raw: str, localization_raw: str):
+    """Returns ((age | None, sex, localization), errors). Age may be sent as
+    "unknown" or empty, which maps to the training-split median exactly like a
+    missing age did in training. sex/localization must be one of the trained
+    categories; "unknown" is one of them and is allowed when chosen explicitly."""
+    errors = []
+    age_text = (age_raw or "").strip().lower()
+    age = None
+    if age_text not in UNKNOWN_AGE_TOKENS:
+        try:
+            age = float(age_text)
+            if not 0 <= age <= 120:
+                errors.append("age must be between 0 and 120, or 'unknown'")
+        except ValueError:
+            errors.append("age must be a number or 'unknown'")
+    sex = (sex_raw or "").strip().lower()
+    if sex not in KNOWN_SEX:
+        errors.append(f"sex must be one of {KNOWN_SEX}")
+    localization = (localization_raw or "").strip().lower()
+    if localization not in KNOWN_LOCALIZATION:
+        errors.append(f"localization must be one of {KNOWN_LOCALIZATION}")
+    return (age, sex, localization), errors
 
 
 def mahalanobis_distance(image_features: torch.Tensor) -> float:
@@ -281,16 +311,36 @@ def readyz():
 @app.post("/predict")
 async def predict(
     file: UploadFile = File(...),
-    age: float = Form(50),
-    sex: str = Form("male"),
-    localization: str = Form("back"),
+    # Required on purpose. These used to default to 50 / "male" / "back", so
+    # any client that skipped the form got a prediction conditioned on a
+    # patient who doesn't exist. "unknown" is accepted when chosen explicitly.
+    age: str = Form(...),
+    sex: str = Form(...),
+    localization: str = Form(...),
     explain: bool = True,
 ):
     timings_ms = {}
 
+    (age_value, sex, localization), input_errors = parse_metadata_form(age, sex, localization)
+    if input_errors:
+        return JSONResponse(
+            {
+                "status": "invalid_input",
+                "errors": input_errors,
+                "allowed": {"sex": KNOWN_SEX, "localization": KNOWN_LOCALIZATION, "age": "0-120 or 'unknown'"},
+            },
+            status_code=422,
+        )
+
     t0 = time.perf_counter()
     image_bytes = await file.read()
-    pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    try:
+        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except Exception:
+        return JSONResponse(
+            {"status": "invalid_input", "errors": ["file is not a readable image"]},
+            status_code=400,
+        )
     t1 = time.perf_counter()
     timings_ms["image_decode"] = (t1 - t0) * 1000
 
@@ -298,9 +348,9 @@ async def predict(
 
     use_metadata = config["train"].get("use_metadata", False)
     metadata_tensor = None
-    # Metadata ko encode karo, jaisa training mein kiya tha
+    # Encode metadata exactly as training did
     if use_metadata:
-        metadata_tensor = encode_metadata(age, sex, localization)
+        metadata_tensor = encode_metadata(age_value, sex, localization)
     t2 = time.perf_counter()
     timings_ms["preprocess"] = (t2 - t1) * 1000
 
@@ -375,6 +425,8 @@ async def predict(
             "operating_point": MALIGNANT_OPERATING_POINT,
         },
         "ood": {"distance": ood_distance, "threshold": OOD_THRESHOLD},
+        # What the model actually conditioned on (age None -> training median).
+        "metadata_used": {"age": age_value, "sex": sex, "localization": localization},
     }
     if gradcam_overlay_b64 is not None:
         response_payload["gradcam_overlay_base64"] = gradcam_overlay_b64

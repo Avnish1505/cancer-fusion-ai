@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import './App.css'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://cancer-fusion-ai-production.up.railway.app'
+// No hosted backend is maintained; default to a locally running `uvicorn app:app`.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
 // Mirrors src/dataset.py's DX_FULL_NAMES — kept in sync manually, same as
 // LOCALIZATION_OPTIONS below.
@@ -44,9 +45,11 @@ const TIMING_LABELS = [
 ]
 
 // Client-side only: keeps invalid/empty ages from being submitted.
-// Does not change what gets sent to the API when valid.
-const getAgeError = (value) => {
-  if (value === '' || value === null || value === undefined) return 'Age is required'
+// Age can be marked unknown explicitly; it is never pre-filled, because a
+// pre-filled value is a guess the fusion model treats as a fact.
+const getAgeError = (value, unknown) => {
+  if (unknown) return null
+  if (value === '' || value === null || value === undefined) return 'Enter an age, or tick Unknown'
   const num = Number(value)
   if (Number.isNaN(num)) return 'Enter a valid number'
   if (num < 0 || num > 120) return 'Enter an age between 0 and 120'
@@ -71,9 +74,12 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
-  const [age, setAge] = useState(50)
-  const [sex, setSex] = useState('male')
-  const [localization, setLocalization] = useState('back')
+  // Deliberately empty: the model conditions on these, so the user has to
+  // choose them (including "Unknown") rather than inherit a default.
+  const [age, setAge] = useState('')
+  const [ageUnknown, setAgeUnknown] = useState(false)
+  const [sex, setSex] = useState('')
+  const [localization, setLocalization] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef(null)
 
@@ -108,15 +114,16 @@ function App() {
     processFile(e.dataTransfer.files?.[0])
   }
 
-  const ageError = getAgeError(age)
+  const ageError = getAgeError(age, ageUnknown)
+  const metadataIncomplete = Boolean(ageError) || !sex || !localization
 
   const handlePredict = async () => {
     if (!selectedFile) {
-      setError('Pehle ek image select karo')
+      setError('Select an image first')
       return
     }
-    if (ageError) {
-      setError('Please fix the highlighted field before predicting')
+    if (metadataIncomplete) {
+      setError('Fill in age, sex and lesion location (Unknown is allowed) before predicting')
       return
     }
     setLoading(true)
@@ -125,7 +132,7 @@ function App() {
     try {
       const formData = new FormData()
       formData.append('file', selectedFile)
-      formData.append('age', age)
+      formData.append('age', ageUnknown ? 'unknown' : age)
       formData.append('sex', sex)
       formData.append('localization', localization)
 
@@ -134,11 +141,14 @@ function App() {
         body: formData,
       })
 
-      if (!response.ok) throw new Error(`Server error: ${response.status}`)
-      const data = await response.json()
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        const detail = data?.errors?.join('; ')
+        throw new Error(detail ? `Invalid input: ${detail}` : `Server error: ${response.status}`)
+      }
       setResult(data)
     } catch (err) {
-      setError(err.message || 'Kuch galat ho gaya, backend check karo')
+      setError(err.message || 'Request failed. Is the backend running?')
     } finally {
       setLoading(false)
     }
@@ -228,11 +238,21 @@ function App() {
                   inputMode="numeric"
                   min="0"
                   max="120"
-                  value={age}
+                  value={ageUnknown ? '' : age}
+                  disabled={ageUnknown}
+                  placeholder={ageUnknown ? 'Unknown' : ''}
                   onChange={(e) => setAge(e.target.value)}
                   aria-invalid={Boolean(ageError)}
                   aria-describedby={ageError ? 'age-error' : undefined}
                 />
+                <label className="field-hint">
+                  <input
+                    type="checkbox"
+                    checked={ageUnknown}
+                    onChange={(e) => setAgeUnknown(e.target.checked)}
+                  />{' '}
+                  Unknown
+                </label>
                 {ageError ? (
                   <span className="field-error" id="age-error" role="alert">
                     {ageError}
@@ -245,6 +265,9 @@ function App() {
               <div className="field">
                 <label htmlFor="sex">SEX</label>
                 <select id="sex" value={sex} onChange={(e) => setSex(e.target.value)}>
+                  <option value="" disabled>
+                    Select…
+                  </option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                   <option value="unknown">Unknown</option>
@@ -260,6 +283,9 @@ function App() {
                   value={localization}
                   onChange={(e) => setLocalization(e.target.value)}
                 >
+                  <option value="" disabled>
+                    Select…
+                  </option>
                   {LOCALIZATION_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -270,7 +296,7 @@ function App() {
             </div>
 
             <div className="input-col input-col--predict">
-              <button className="predict-button" onClick={handlePredict} disabled={loading || !selectedFile}>
+              <button className="predict-button" onClick={handlePredict} disabled={loading || !selectedFile || metadataIncomplete}>
                 {loading ? 'Analyzing…' : 'Predict'}
               </button>
             </div>

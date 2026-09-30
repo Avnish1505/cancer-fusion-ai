@@ -216,8 +216,15 @@ def stratified_split(
     """
     Splits by lesion_id when available (to avoid the SAME lesion's images
     leaking across train/val/test — a common HAM10000 pitfall since some
-    lesions have multiple photos), otherwise falls back to a plain stratified
-    split on image_id.
+    lesions have multiple photos), otherwise falls back to a plain split on
+    image_id.
+
+    Despite the name, this is NOT class-stratified: train_test_split is called
+    on the unique group ids without `stratify=`, so class proportions per split
+    are only approximately equal (random grouping). It is left as-is on
+    purpose: every cached logit file in reports/ and the served checkpoint's
+    val-fitted artifacts depend on this exact split, and v2 (src/train_v2.py)
+    reuses it so v1 and v2 are scored on the same test images.
     """
     total = train_split + val_split + test_split
     if not (0.99 <= total <= 1.01):
