@@ -1,0 +1,59 @@
+# ============================================================
+# Cancer Fusion AI - v2 training recipe (src/train_v2.py)
+# Split settings are identical to configs/config.yaml on purpose:
+# v1 and v2 must be scored on the same test images.
+# Paths below are the Kaggle "skin-cancer-mnist-ham10000" dataset.
+# ============================================================
+
+run_name: null            # defaults to "fusion" or "image_only"
+
+data:
+  metadata_csv: "/kaggle/input/skin-cancer-mnist-ham10000/HAM10000_metadata.csv"
+  images_dir_part1: "/kaggle/input/skin-cancer-mnist-ham10000/HAM10000_images_part_1"
+  images_dir_part2: "/kaggle/input/skin-cancer-mnist-ham10000/HAM10000_images_part_2"
+  image_extension: ".jpg"
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  random_seed: 42         # split seed - do not change if you want to compare with v1
+
+model:
+  # Alternatives that fit a Kaggle T4/P100 at 384px:
+  #   efficientnet_b3.ra2_in1k   (faster, ImageNet-1k only)
+  #   convnext_tiny.fb_in22k_ft_in1k_384
+  backbone: "tf_efficientnetv2_s.in21k_ft_in1k"
+  pretrained: true
+  num_classes: 7
+  dropout: 0.3
+  drop_path_rate: 0.1
+
+train:
+  seed: 0                 # training seed; run 2-3 seeds before believing a <2pt gain
+  use_metadata: true      # false = image-only ablation, same everything else
+  meta_dropout: 0.25      # per-field probability of blanking age/sex/site in training
+  image_size: 384
+  color_constancy: true   # Shades of Gray, applied at train, eval and serve time
+  batch_size: 24
+  num_epochs: 25
+  warmup_epochs: 1
+  learning_rate: 0.0001   # backbone LR; new layers get head_lr_mult x this
+  head_lr_mult: 10.0
+  weight_decay: 0.02
+  class_weight_power: 0.5 # v1 used 1.0 (full inverse frequency)
+  label_smoothing: 0.0
+  grad_clip: 1.0
+  amp: true
+  channels_last: true
+  ema: true
+  ema_decay: 0.998
+  select_metric: "balanced_accuracy"
+  early_stopping_patience: 8
+  tta_views: 8
+  num_workers: 4
+  device: "cuda"
+
+paths:
+  output_dir: "./runs_v2"
+
+logging:
+  log_every_n_steps: 50

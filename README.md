@@ -84,7 +84,7 @@ Metadata ──► MLP (128 → 64) ──► meta_features (64-d)
 
 The dataset is heavily imbalanced (`nv` ≈ 67% of samples, measured from `data/HAM10000_metadata.csv`) — handled via inverse-frequency class weighting (`src/dataset.py:252-266`, used in `src/train.py:126-129`).
 
-**Split strategy:** stratified split **by `lesion_id`**, not by image, since some lesions have multiple photos. This prevents the same lesion's images from leaking across train/val/test (`src/dataset.py:209-225`). Configured as train/val/test = 0.7/0.15/0.15 with `random_seed: 42` (`configs/config.yaml:13-16`); on the current metadata CSV this yields a 1,543-image test set — see [Results](#-results).
+**Split strategy:** grouped split **by `lesion_id`**, not by image, since some lesions have multiple photos. This prevents the same lesion's images from leaking across train/val/test. The function is named `stratified_split` but it is not class-stratified: lesion ids are split at random without `stratify=`, so class proportions per split are only approximately equal. It is kept unchanged because every cached result and the served checkpoint depend on this exact split. Configured as train/val/test = 0.7/0.15/0.15 with `random_seed: 42` (`configs/config.yaml:13-16`); on the current metadata CSV this yields a 1,543-image test set — see [Results](#-results).
 
 ---
 
@@ -123,8 +123,6 @@ train:
   use_class_weights: true
   device: "cuda"
 ```
-
-> ⚠️ The `configs/config.yaml` shipped in this repo currently has **two top-level `train:` blocks**. YAML does not error on duplicate top-level keys — it silently keeps only the last one, so the first block's values are dead. This should be cleaned up; until it is, only the second `train:` block (the one matching the example above) actually takes effect.
 
 ### Train
 
@@ -170,6 +168,13 @@ Then either run it directly:
 uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
+`age`, `sex` and `localization` are **required** form fields. They used to default to 50 / `male` / `back`, which meant any client that skipped the form got a prediction conditioned on a patient who doesn't exist. `unknown` is accepted for each field when chosen explicitly (unknown age maps to the training-split median, exactly how missing ages were imputed in training). Unrecognised categories return a 422 listing the allowed values instead of being silently encoded as an all-zero row. The response includes `metadata_used` so callers can see what the model conditioned on.
+
+```bash
+curl -F file=@lesion.jpg -F age=62 -F sex=female -F localization=back \
+     "http://127.0.0.1:8000/predict?explain=false"
+```
+
 or via Docker — note the checkpoint is **volume-mounted, not baked into the image** (see [Known Limitations](#-known-limitations)):
 
 ```bash
@@ -194,7 +199,7 @@ The backend URL is read from `VITE_API_BASE_URL` (`frontend/src/App.jsx:4`), a V
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-If `VITE_API_BASE_URL` is unset, the app falls back to a hardcoded Railway URL baked into `frontend/src/App.jsx:4` and `frontend/.env.example` — **that fallback is not a maintained live demo**; this project's backend is not currently deployed anywhere, and the fallback should not be relied on. Always set `VITE_API_BASE_URL` explicitly to a backend you're running yourself (e.g. the `uvicorn` command above). `frontend/vite.config.js` and CORS in `app.py` are set up for the default Vite dev server ports (`localhost:5173` / `127.0.0.1:5173`).
+If `VITE_API_BASE_URL` is unset, the app falls back to `http://127.0.0.1:8000`, i.e. a backend you run yourself with the `uvicorn` command above. No hosted backend is maintained. The form no longer pre-fills age, sex or location; the user has to pick a value or mark it Unknown before Predict is enabled. `frontend/vite.config.js` and CORS in `app.py` are set up for the default Vite dev server ports (`localhost:5173` / `127.0.0.1:5173`).
 
 `npm run build` produces a static `frontend/dist/` you can serve or deploy separately from the backend.
 
@@ -229,6 +234,23 @@ The majority-class baseline matters here: `nv` is ~64% of the test set, so a tri
 
 ![Confusion matrix](reports/confusion_matrix.png)
 
+### External validation (official ISIC 2018 Task 3 test set, `src/evaluate_isic2018.py`)
+
+The internal test set comes from the same source as training. The ISIC 2018 Task 3 test set (1,511 images, leakage-checked by image id, lesion id and file hash) is the more honest number, and it is noticeably lower:
+
+| Metric | Internal test (n=1,543) | ISIC 2018 test (n=1,511) |
+|---|---|---|
+| Accuracy | 0.8017 | 0.7538 |
+| Balanced accuracy (the ISIC 2018 ranking metric) | 0.7221 [0.682, 0.764] | 0.6531 [0.609, 0.695] |
+| Macro-F1 | 0.7120 | 0.6575 |
+| Melanoma recall | 0.7045 | 0.6901 |
+| Melanoma one-vs-rest AUC | 0.908 | 0.897 |
+| Malignant (mel+bcc+akiec) vs benign AUC | 0.925 | 0.900 |
+
+Brackets are 95% bootstrap CIs. For scale, the best ISIC 2018 Task 3 submission reached 0.885 balanced accuracy ([Codella et al. 2019](https://arxiv.org/abs/1902.03368)). The gap to that is the main thing left to fix, and it is why the v2 training recipe below exists.
+
+**Tried and rejected: post-hoc decision offsets.** Fitting a per-class logit offset on validation to maximise balanced accuracy (constrained to not lose validation melanoma recall) lifts ISIC 2018 balanced accuracy from 0.653 to 0.704 on one fit, but refitting on 20 bootstrap resamples of validation gives a median gain of only +0.013 (range −0.012 to +0.056), and it costs ~5 points of accuracy and ~7 points of melanoma precision. It moves errors between classes; it doesn't make the model better, and AUCs (threshold-free) can't change. Not shipped.
+
 ### Calibration (test set, `src/calibrate.py`)
 
 Temperature scaling divides logits by a positive scalar before softmax, so it cannot change argmax, predictions, accuracy, macro-F1, or the confusion matrix above — it only reshapes the reported confidence distribution.
@@ -253,7 +275,40 @@ The fitted `T=2.1235` is what `app.py:107` (`TEMPERATURE = 2.1235`) actually ser
 - **The test set has a small melanoma sample (n=176 of 1,543 total).** The 70.45% recall estimate carries real sampling noise and is not reported here with a confidence interval; treat it as a point estimate from one held-out split, not a precise clinical figure.
 - **Calibration is slightly under-confident in the dominant (highest-confidence) prediction bin after fitting.** At the fitted `T=2.1235`, the top confidence bin (`[0.93, 1.0]`, 669 of 1,543 test predictions — mostly correctly-classified `nv`) reports ~98.4% mean confidence against ~98.7% actual accuracy in that bin: a small but real under-confidence, in the bin holding the most probability mass. Mid-confidence bins show a mix of over- and under-confidence in both directions. Net effect: fitted `T` beats uncalibrated on all three calibration metrics, and beats the old hand-picked `T=2.5` on NLL and MCE, but is marginally worse than `T=2.5` on test-set ECE — `T` was fit on validation, not test, so some val→test generalization gap is expected.
 - **Training data is predominantly light-skinned.** HAM10000's source documentation describes it as collected primarily from patients in Austria and Australia, skewed toward lighter Fitzpatrick skin types. This repo's own metadata (`data/HAM10000_metadata.csv`) does not record skin tone, so this can't be verified or quantified from the data used here — it's a known characteristic of the source dataset, not something measured in this repo. Expect degraded and unquantified performance on darker skin tones.
-- **No out-of-distribution detection.** Nothing in `app.py` or the model checks whether an uploaded image resembles a dermatoscopic lesion image at all — a photo of anything else is still routed through the same 7-way softmax and returns a confident-looking prediction.
+- **The OOD guard is only validated on easy cases.** `/predict` rejects images whose image-encoder features are far (Mahalanobis, Ledoit-Wolf covariance) from the training distribution; the threshold accepts 95% of internal validation images, so about 1 in 20 genuine dermoscopy images is rejected too. It was checked against COCO photos and synthetic patterns, which are far out of distribution. It has not been validated on ordinary phone photos of skin lesions, which is the realistic misuse case, and the UI says so.
+- **Metadata carries shortcut signal.** Age/sex/site alone (logistic regression on the training split) reach ~0.33 balanced accuracy on the internal test set versus 0.14 for chance. With a constant gray image, the v1 fusion head's prediction swings between `nv`, `vasc`, `akiec` and `bcc` purely on the form fields. Whether fusion actually helps v1 on real images is unmeasured; `python -m src.metadata_sensitivity` measures how often real predictions change with the form, and the v2 recipe has an image-only ablation built in.
+
+---
+
+## 🧪 v2 training recipe
+
+v1 is a ResNet50 at 224px (600×450 images squashed to a square), full inverse-frequency class weights, constant learning rate. The serving layer around it (calibration, conformal sets, OOD guard, malignant flag) is solid, but it can only put honest error bars on a weak classifier. v2 (`src/train_v2.py`, `src/v2/`, `configs/config_v2.yaml`) changes the classifier and leaves v1 serving untouched until v2 wins:
+
+- timm backbone, default EfficientNetV2-S (ImageNet-21k pretrained) at 384px, aspect-preserving crops
+- Shades of Gray colour constancy at train/eval time (device and lighting differ between HAM10000 and ISIC 2018 test images)
+- dihedral + affine + blur + random-erasing augmentation; 8-view TTA at evaluation
+- sqrt-inverse-frequency class weights instead of full inverse frequency
+- AdamW with a 10× head learning rate, 1-epoch warmup then cosine decay, AMP, gradient clipping, EMA weights
+- model selection on validation balanced accuracy (the ISIC 2018 metric), melanoma recall logged every epoch
+- metadata with explicit missing flags and per-field dropout during training, so "not provided" is learned from the whole label distribution instead of from the ~57 mostly-benign rows labelled `unknown`
+- same split as v1, so both are scored on the same test images
+
+Run it on a Kaggle GPU notebook with the `skin-cancer-mnist-ham10000` dataset attached (and your ISIC 2018 test files uploaded as a private dataset for the external check):
+
+```bash
+git clone -b feat/v2-training-recipe https://github.com/Avnish1505/cancer-fusion-ai.git && cd cancer-fusion-ai
+pip install -q timm
+python -m src.train_v2 --config configs/config_v2.yaml                                   # fusion
+python -m src.train_v2 --config configs/config_v2.yaml --set train.use_metadata=false    # image-only ablation
+python -m src.train_v2 --config configs/config_v2.yaml --set train.seed=1 --set run_name=fusion_seed1
+python -m src.evaluate_v2 --checkpoint runs_v2/fusion/best_model_v2.pt \
+    --isic-images-dir /kaggle/input/<your-isic2018-test>/ISIC2018_Task3_Test_Images \
+    --isic-groundtruth /kaggle/input/<your-isic2018-test>/ISIC2018_Task3_Test_GroundTruth.tab
+```
+
+Each epoch prints its wall time, so the first one tells you what a full run costs. `evaluate_v2` scores the checkpoint with the form filled in and with all metadata withheld, and prints a paired bootstrap comparison against the cached v1 logits on the same images. Ship v2 only if the external balanced-accuracy delta has a 95% CI above zero and melanoma recall and AUC don't drop; run a second seed before trusting any gain under about 2 points. Serving a v2 checkpoint (re-exporting temperature, conformal quantiles, malignant thresholds and the Mahalanobis guard from v2's caches) is the step after that.
+
+`python tests/v2_smoke_test.py` runs the whole v2 pipeline on a tiny synthetic dataset on CPU in about 30 seconds.
 
 ---
 
@@ -283,7 +338,10 @@ cancer-fusion-ai/
 │   ├── evaluate.py                 # held-out evaluation (classification report + confusion matrix)
 │   ├── calibrate.py                 # post-hoc temperature scaling (Guo et al. 2017), val-fit/test-report
 │   ├── error_analysis.py             # per-class + melanoma/BCC/AKIEC error breakdown, reads calibrate.py's cache
-│   └── utils.py                       # seeding, device selection, checkpoint I/O
+│   ├── utils.py                       # seeding, device selection, checkpoint I/O
+│   ├── train_v2.py / evaluate_v2.py   # v2 recipe + paired comparison vs v1 (see v2 training recipe)
+│   ├── metadata_sensitivity.py        # how often v1 predictions change with the metadata form
+│   └── v2/                            # v2 model, metadata encoder, transforms, training engine
 ├── configs/
 │   ├── config.yaml
 │   └── local_config.yaml
@@ -351,7 +409,6 @@ These numbers characterize *where* per-request time goes on one local run, not w
 - **Grad-CAM's backward pass is the dominant per-request cost.** `/predict` (Grad-CAM on, default) runs a full forward + backward pass plus heatmap rendering; `/predict?explain=false` skips all of that and runs a plain forward pass under `torch.inference_mode()`. Measured locally, that's the difference between ~100ms and ~31ms per request (see Performance above). Use `explain=false` when only the classification result is needed.
 - **The shipped checkpoint (`models/best_model.pt`) is Git LFS-tracked and is *not* copied into the Docker image.** `Dockerfile` only creates an empty `models/` directory; the real checkpoint arrives via the `docker-compose.yml` volume mount. A container built and run without that mount (or without `git lfs pull` beforehand in whatever deploy path supplies the file) will fail at startup when it tries to load `models/best_model.pt`.
 - **Training and serving disagree on checkpoint location.** `python -m src.train` writes to `paths.checkpoint_dir` (`./checkpoints/best_model.pt` by default, `configs/config.yaml:36`); `app.py:80` hardcodes `models/best_model.pt`. Retraining locally does not automatically update what the API serves — you'd need to copy the new checkpoint over.
-- **`configs/config.yaml` has two top-level `train:` blocks.** YAML silently keeps only the last one (PyYAML doesn't error on duplicate keys), so the first block's values are dead code in the file. Not a runtime bug today (the second block happens to be the intended one), but misleading to read.
 - **LLM-generated clinical report summaries are not implemented.** See [Roadmap](#-roadmap--not-yet-implemented).
 - **No backend is currently deployed.** The frontend's `VITE_API_BASE_URL` fallback points at a Railway URL, but that is not a maintained live demo — see [Frontend](#frontend). Run the backend yourself to use the frontend.
 
@@ -366,7 +423,8 @@ Product roadmap:
 - [ ] **Phase 5** — Lightweight deployment: Gradio/Streamlit demo for interactive upload → prediction → Grad-CAM → report
 - [ ] **LLM-generated clinical report summaries** — designed, not implemented. No NVIDIA NIM / OpenAI code exists anywhere in this repo's working tree or git history; `openai` sits unused in `requirements.txt`. A previous README version showed an illustrative example report as if it were real output — it wasn't, and has been removed.
 - [ ] **Explainability demo notebook** (`notebooks/explainability_demo.ipynb`) — referenced in earlier docs, never actually committed to this repo.
-- [ ] **Out-of-distribution detection** — nothing currently flags a non-lesion image before it's fed through the classifier; see [Limitations](#-limitations).
+- [x] **Out-of-distribution detection** — Mahalanobis guard in `/predict` (far-OOD only; near-OOD phone photos not validated, see [Limitations](#-limitations))
+- [ ] **v2 model trained and scored** — recipe and evaluation are in the repo (see [v2 training recipe](#-v2-training-recipe)); no v2 checkpoint has been trained yet
 - [ ] **A deployed, publicly reachable backend** — the frontend currently has no live backend to talk to by default; see [Known Limitations](#-known-limitations).
 
 Repo housekeeping (referenced elsewhere in this README, not yet added):
