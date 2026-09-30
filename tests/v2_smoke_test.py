@@ -124,6 +124,10 @@ def test_pipeline():
             for scenario in ("with_metadata", "metadata_withheld"):
                 assert report["sets"][s][scenario]["vs_v1"]["balanced_accuracy"]["ci95"], (s, scenario)
         assert "| external_isic2018 | metadata_withheld | mel_auc |" in out
+        out_img = run([py, "-m", "src.evaluate_v2", "--checkpoint", str(tmp / "runs" / "image_only" / "best_model_v2.pt"),
+                       "--config", str(cfg_path), "--v1-internal-cache", str(v1_int), "--tta", "1",
+                       "--num-workers", "0", "--n-boot", "20"], REPO_ROOT)
+        assert "| internal_test | image_only_model |" in out_img and "with_metadata" not in out_img
         print("[ok] train_v2 (fusion + image-only) and evaluate_v2 end to end")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

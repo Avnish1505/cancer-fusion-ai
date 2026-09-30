@@ -85,7 +85,12 @@ def compare_with_v1(name: str, y: np.ndarray, v2_logits: np.ndarray, v1_cache: P
 def run_set(name, df, model, encoder, state, device, tta, bs, workers, amp):
     tf = get_eval_transforms(state["image_size"], state["color_constancy"])
     results = {}
-    scenarios = [("with_metadata", False)] + ([("metadata_withheld", True)] if encoder is not None else [])
+    # An image-only checkpoint never sees metadata, so labelling its single
+    # scenario "with_metadata" (as the first version did) was misleading.
+    if encoder is None:
+        scenarios = [("image_only_model", False)]
+    else:
+        scenarios = [("with_metadata", False), ("metadata_withheld", True)]
     for scenario, drop_all in scenarios:
         ds = LesionDataset(df, tf, encoder, drop_all_metadata=drop_all)
         loader = DataLoader(ds, batch_size=bs, shuffle=False, num_workers=workers, pin_memory=device.type == "cuda")
