@@ -1,0 +1,23 @@
+{
+  "run": "fusion",
+  "best_epoch": 9,
+  "tta_views": 8,
+  "val": {
+    "accuracy": 0.8660415271265908,
+    "balanced_accuracy": 0.7899393814692146,
+    "macro_f1": 0.7629827500648567,
+    "mel_recall": 0.7213114754098361,
+    "mel_precision": 0.49162011173184356,
+    "mel_auc": 0.9459112051751145,
+    "malignant_auc": 0.962106197406792
+  },
+  "test": {
+    "accuracy": 0.8729747245625405,
+    "balanced_accuracy": 0.7624480946976205,
+    "macro_f1": 0.780167562538649,
+    "mel_recall": 0.7727272727272727,
+    "mel_precision": 0.6017699115044248,
+    "mel_auc": 0.9584109197313294,
+    "malignant_auc": 0.9666269883661188
+  }
+}

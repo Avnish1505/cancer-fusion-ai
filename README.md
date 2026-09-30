@@ -247,7 +247,7 @@ The internal test set comes from the same source as training. The ISIC 2018 Task
 | Melanoma one-vs-rest AUC | 0.908 | 0.897 |
 | Malignant (mel+bcc+akiec) vs benign AUC | 0.925 | 0.900 |
 
-Brackets are 95% bootstrap CIs. For scale, the best ISIC 2018 Task 3 submission reached 0.885 balanced accuracy ([Codella et al. 2019](https://arxiv.org/abs/1902.03368)). The gap to that is the main thing left to fix, and it is why the v2 training recipe below exists.
+Brackets are 95% bootstrap CIs. For scale, the best ISIC 2018 Task 3 submission reached 0.885 balanced accuracy ([Codella et al. 2019](https://arxiv.org/abs/1902.03368)). v2 (below) closes about half of that gap and removes the internal-to-external drop.
 
 **Tried and rejected: post-hoc decision offsets.** Fitting a per-class logit offset on validation to maximise balanced accuracy (constrained to not lose validation melanoma recall) lifts ISIC 2018 balanced accuracy from 0.653 to 0.704 on one fit, but refitting on 20 bootstrap resamples of validation gives a median gain of only +0.013 (range −0.012 to +0.056), and it costs ~5 points of accuracy and ~7 points of melanoma precision. It moves errors between classes; it doesn't make the model better, and AUCs (threshold-free) can't change. Not shipped.
 
@@ -280,7 +280,48 @@ The fitted `T=2.1235` is what `app.py:107` (`TEMPERATURE = 2.1235`) actually ser
 
 ---
 
-## 🧪 v2 training recipe
+## 🧪 v2 model
+
+### v2 results
+
+One full training run each on a Kaggle T4, scored on the same images as v1. Brackets are paired bootstrap 95% CIs of the difference from v1. Everything here is reproducible from the committed logits in `reports/v2/` with `python -m src.analyze_v2`, no GPU or images needed.
+
+| | v1 | v2 fusion | v2 image-only |
+|---|---|---|---|
+| ISIC 2018 balanced accuracy | 0.653 | 0.782 (+0.129 [+0.088, +0.171]) | 0.750 (+0.097 [+0.057, +0.138]) |
+| ISIC 2018 macro-F1 | 0.657 | 0.804 (+0.146 [+0.109, +0.184]) | 0.779 (+0.121 [+0.085, +0.158]) |
+| ISIC 2018 melanoma AUC | 0.898 | 0.939 (+0.041 [+0.017, +0.066]) | 0.926 (+0.028 [+0.001, +0.055]) |
+| ISIC 2018 malignant AUC | 0.898 | 0.954 (+0.055 [+0.037, +0.074]) | 0.944 (+0.045 [+0.026, +0.065]) |
+| ISIC 2018 melanoma recall | 0.690 | 0.754 (+0.064 [−0.012, +0.141]) | 0.702 (+0.012 [−0.067, +0.093]) |
+| Internal test balanced accuracy | 0.722 | 0.762 (+0.040 [+0.006, +0.075]) | 0.720 (−0.002 [−0.041, +0.037]) |
+| Internal test melanoma AUC | 0.912 | 0.958 (+0.047 [+0.029, +0.063]) | 0.938 (+0.026 [+0.005, +0.049]) |
+
+AUCs in this table use plain softmax for both models, which is why v1's differ slightly from the temperature-scaled numbers above.
+
+What this shows and what it doesn't:
+
+- v1 lost 7 points going from its internal test set to ISIC 2018 (0.722 to 0.653). v2 fusion doesn't lose anything (0.762 to 0.782).
+- The gap to the best 2018 submission (0.885) shrinks from about 23 points to about 10. v2 is a single model with no extra training data; most top 2018 entries were ensembles.
+- Melanoma recall does not improve significantly in any run. The AUCs do.
+- Training-seed variance is not measured yet. The paired CIs cover test-set sampling noise only. A second fusion run (`reports/v2/fusion_seed1`) was interrupted before training finished; its best early checkpoint still scored 0.750 balanced accuracy and 0.950 melanoma AUC on ISIC 2018, but it is not a finished replicate.
+
+**Fusion vs image-only** (paired, same images, `src/analyze_v2.py`): fusion is ahead on both test sets, on ISIC 2018 by +0.033 [+0.003, +0.061] balanced accuracy and +0.013 [+0.002, +0.024] melanoma AUC. Little of that comes from the form fields at prediction time: the fusion model with all metadata withheld still scores 0.774, and giving it the metadata back adds +0.008 [−0.003, +0.019] balanced accuracy and +0.006 [+0.003, +0.009] melanoma AUC. Either training with metadata and metadata dropout helped the image branch, or the image-only run was an unlucky seed; one run each can't separate the two. The image recipe does most of the work: image-only alone is +0.097 over v1 on ISIC 2018.
+
+**Safety layer re-derived for v2** from validation only (temperature, 95%-sensitivity malignant threshold, Mondrian-LAC sets at α = 0.10), then applied unchanged to ISIC 2018:
+
+| ISIC 2018 | v1 | v2 fusion |
+|---|---|---|
+| Malignant sensitivity (threshold set for 0.95 on validation) | 0.961 [0.939, 0.981] | 0.941 [0.915, 0.966] |
+| Malignant specificity | 0.578 [0.550, 0.606] | 0.793 [0.770, 0.815] |
+| Benign lesions flagged per malignant lesion caught | 1.72 | 0.86 |
+| Conformal coverage (target 0.90) / mean set size | 0.905 / 1.86 | 0.915 / 1.64 |
+| ECE | 0.042 | 0.029 |
+
+At about the same sensitivity, false alarms per caught cancer halve. For a screening flag this is the number that matters, and it is where the AUC gain shows up in practice. v2's external sensitivity sits slightly under the 0.95 target; its CI includes it.
+
+**v2 is not served yet.** `/predict` still runs v1. Serving v2 needs its ~80MB checkpoint hosted somewhere other than plain git, the Mahalanobis OOD guard refit on v2 image features, and these validation-fitted numbers exported into `models/inference_artifacts.json`.
+
+### v2 training recipe
 
 v1 is a ResNet50 at 224px (600×450 images squashed to a square), full inverse-frequency class weights, constant learning rate. The serving layer around it (calibration, conformal sets, OOD guard, malignant flag) is solid, but it can only put honest error bars on a weak classifier. v2 (`src/train_v2.py`, `src/v2/`, `configs/config_v2.yaml`) changes the classifier and leaves v1 serving untouched until v2 wins:
 
@@ -293,20 +334,34 @@ v1 is a ResNet50 at 224px (600×450 images squashed to a square), full inverse-f
 - metadata with explicit missing flags and per-field dropout during training, so "not provided" is learned from the whole label distribution instead of from the ~57 mostly-benign rows labelled `unknown`
 - same split as v1, so both are scored on the same test images
 
-Run it on a Kaggle GPU notebook with the `skin-cancer-mnist-ham10000` dataset attached (and your ISIC 2018 test files uploaded as a private dataset for the external check):
+How the results above were produced, in a Kaggle notebook with a T4 GPU, internet on, and the `skin-cancer-mnist-ham10000` dataset attached. The repo's own metadata CSV is used so the split matches v1 exactly:
 
-```bash
-git clone -b feat/v2-training-recipe https://github.com/Avnish1505/cancer-fusion-ai.git && cd cancer-fusion-ai
-pip install -q timm
-python -m src.train_v2 --config configs/config_v2.yaml                                   # fusion
-python -m src.train_v2 --config configs/config_v2.yaml --set train.use_metadata=false    # image-only ablation
-python -m src.train_v2 --config configs/config_v2.yaml --set train.seed=1 --set run_name=fusion_seed1
-python -m src.evaluate_v2 --checkpoint runs_v2/fusion/best_model_v2.pt \
-    --isic-images-dir /kaggle/input/<your-isic2018-test>/ISIC2018_Task3_Test_Images \
-    --isic-groundtruth /kaggle/input/<your-isic2018-test>/ISIC2018_Task3_Test_GroundTruth.tab
+```python
+import glob
+P1 = glob.glob('/kaggle/input/**/HAM10000_images_part_1', recursive=True)[0]
+P2 = glob.glob('/kaggle/input/**/HAM10000_images_part_2', recursive=True)[0]
+%cd /kaggle/working
+!GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://github.com/Avnish1505/cancer-fusion-ai.git
+%cd /kaggle/working/cancer-fusion-ai
+!pip install -q -U timm
+COMMON = (f"--config configs/config_v2.yaml --set data.metadata_csv=data/HAM10000_metadata.csv "
+          f"--set 'data.images_dir_part1={P1}' --set 'data.images_dir_part2={P2}'")
+!python -u -m src.train_v2 {COMMON}                                      # fusion
+!python -u -m src.train_v2 {COMMON} --set train.use_metadata=false       # image-only ablation
+
+# ISIC 2018 test set, same Harvard Dataverse files as src/evaluate_isic2018.py
+!mkdir -p /kaggle/temp/isic
+%cd /kaggle/temp/isic
+!wget -q -O images.zip https://dataverse.harvard.edu/api/access/datafile/3855824
+!unzip -q images.zip
+!wget -q -O ISIC2018_Task3_Test_GroundTruth.tab https://dataverse.harvard.edu/api/access/datafile/6924466
+%cd /kaggle/working/cancer-fusion-ai
+ISIC = "--isic-images-dir /kaggle/temp/isic/ISIC2018_Task3_Test_Images --isic-groundtruth /kaggle/temp/isic/ISIC2018_Task3_Test_GroundTruth.tab"
+for run in ["fusion", "image_only"]:
+    !python -u -m src.evaluate_v2 --checkpoint runs_v2/{run}/best_model_v2.pt {COMMON} {ISIC}
 ```
 
-Each epoch prints its wall time, so the first one tells you what a full run costs. `evaluate_v2` scores the checkpoint with the form filled in and with all metadata withheld, and prints a paired bootstrap comparison against the cached v1 logits on the same images. Ship v2 only if the external balanced-accuracy delta has a 95% CI above zero and melanoma recall and AUC don't drop; run a second seed before trusting any gain under about 2 points. Serving a v2 checkpoint (re-exporting temperature, conformal quantiles, malignant thresholds and the Mahalanobis guard from v2's caches) is the step after that.
+An epoch took about 3 minutes; the fusion run early-stopped at epoch 17 (best epoch 9), the image-only run at epoch 23 (best epoch 15). `evaluate_v2` scores each checkpoint with and without metadata and prints paired comparisons against the cached v1 logits. Copy `runs_v2/*/eval`, `summary.json`, `history.json` and `cache/` (not the checkpoints) into `reports/v2/` to update the numbers above.
 
 `python tests/v2_smoke_test.py` runs the whole v2 pipeline on a tiny synthetic dataset on CPU in about 30 seconds.
 
@@ -340,6 +395,7 @@ cancer-fusion-ai/
 │   ├── error_analysis.py             # per-class + melanoma/BCC/AKIEC error breakdown, reads calibrate.py's cache
 │   ├── utils.py                       # seeding, device selection, checkpoint I/O
 │   ├── train_v2.py / evaluate_v2.py   # v2 recipe + paired comparison vs v1 (see v2 training recipe)
+│   ├── analyze_v2.py                  # re-derives every v2 README number from reports/v2/ logits
 │   ├── metadata_sensitivity.py        # how often v1 predictions change with the metadata form
 │   └── v2/                            # v2 model, metadata encoder, transforms, training engine
 ├── configs/
@@ -424,7 +480,9 @@ Product roadmap:
 - [ ] **LLM-generated clinical report summaries** — designed, not implemented. No NVIDIA NIM / OpenAI code exists anywhere in this repo's working tree or git history; `openai` sits unused in `requirements.txt`. A previous README version showed an illustrative example report as if it were real output — it wasn't, and has been removed.
 - [ ] **Explainability demo notebook** (`notebooks/explainability_demo.ipynb`) — referenced in earlier docs, never actually committed to this repo.
 - [x] **Out-of-distribution detection** — Mahalanobis guard in `/predict` (far-OOD only; near-OOD phone photos not validated, see [Limitations](#-limitations))
-- [ ] **v2 model trained and scored** — recipe and evaluation are in the repo (see [v2 training recipe](#-v2-training-recipe)); no v2 checkpoint has been trained yet
+- [x] **v2 model trained and scored** — see [v2 results](#v2-results)
+- [ ] **Serve v2** — host the checkpoint, refit the OOD guard on v2 features, export v2 artifacts
+- [ ] **A finished second training seed** for fusion and image-only
 - [ ] **A deployed, publicly reachable backend** — the frontend currently has no live backend to talk to by default; see [Known Limitations](#-known-limitations).
 
 Repo housekeeping (referenced elsewhere in this README, not yet added):
