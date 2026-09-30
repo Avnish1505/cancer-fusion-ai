@@ -1,4 +1,4 @@
-# 🩺 Cancer Fusion AI
+#  Cancer Fusion AI
 
 > An open-source framework for multimodal medical AI, in active development.
 
@@ -27,13 +27,13 @@ Built as an end-to-end, phased project: from an image-only baseline to a fused m
 
 ---
 
-## 🧠 Why this project
+##  Why this project
 
 Skin cancer classifiers are usually judged only on accuracy. In a clinical-adjacent setting, that's not enough — a model needs to show **what** it looked at and **why**, and it needs to fold in the kind of context (age, sex, lesion site) that a real clinician would use. This project treats explainability as a first-class feature, not an afterthought.
 
 ---
 
-## ❤️ Why Open Source?
+##  Why Open Source?
 
 Cancer Fusion AI is developed as an open-source project to make reproducible medical AI workflows accessible to students, researchers, and developers worldwide. The goal is to encourage collaboration, transparency, reproducible research, and community-driven improvements.
 
