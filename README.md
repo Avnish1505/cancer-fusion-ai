@@ -12,8 +12,8 @@ Contributions are welcome!
 ![Status](https://img.shields.io/badge/Status-Active-success)
 ![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen)
 ![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-blue)
-![Open Source Love](https://badges.frapsoft.com/os/v1/open-source.svg?v=103)
-![Made with Love](https://img.shields.io/badge/Made%20with-❤️-red)
+
+
 
 > The Docker image (`Dockerfile:7`) targets Python 3.12; `runtime.txt` (used by the Procfile/buildpack deploy path) pins Python 3.10 — the two deploy paths currently disagree on version. A `LICENSE` file has not been added to this repo yet, so treat the MIT badge as aspirational (see [Known Limitations](#-known-limitations)).
 
